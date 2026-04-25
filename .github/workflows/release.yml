@@ -39,16 +39,23 @@ jobs:
 
       - name: Create GitHub Release
         run: |
-          if [ ! -f VERSION ]; then
-            echo "No new version released — skipping."
-            exit 0
+          # go-semantic-release may partially complete (tag pushed, publish failed).
+          # Scan all tags and create GitHub Releases for any that are missing one.
+          # This is idempotent: existing releases are skipped.
+          LATEST_TAG=""
+          for TAG in $(git tag --sort=version:refname); do
+            if ! gh release view "${TAG}" > /dev/null 2>&1; then
+              echo "Creating release for ${TAG}"
+              gh release create "${TAG}" --title "${TAG}" --generate-notes --verify-tag
+              LATEST_TAG="${TAG}"
+            fi
+          done
+          if [ -n "${LATEST_TAG}" ]; then
+            echo "${LATEST_TAG#v}" > VERSION
+            echo "VERSION set to ${LATEST_TAG#v}"
+          elif [ ! -f VERSION ]; then
+            echo "No new tags without releases — nothing to do."
           fi
-          TAG="v$(cat VERSION)"
-          if gh release view "${TAG}" > /dev/null 2>&1; then
-            echo "Release ${TAG} already exists — skipping."
-            exit 0
-          fi
-          gh release create "${TAG}" --title "${TAG}" --notes-from-tag --verify-tag
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
@@ -65,7 +72,8 @@ jobs:
             echo "No new version released — nothing to commit."
             exit 0
           fi
-          git add CHANGELOG.md VERSION pyproject.toml
+          git add VERSION pyproject.toml
+          if [ -f CHANGELOG.md ]; then git add CHANGELOG.md; fi
           git diff --cached --quiet || git commit -m "chore(release): update version files [skip ci]"
           git push origin HEAD:main
 
