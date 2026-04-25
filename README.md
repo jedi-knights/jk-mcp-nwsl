@@ -1,7 +1,7 @@
 # jk-mcp-nwsl
 
 [![CI](https://github.com/jedi-knights/jk-mcp-nwsl/actions/workflows/ci.yml/badge.svg)](https://github.com/jedi-knights/jk-mcp-nwsl/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://jedi-knights.github.io/jk-mcp-nwsl/)
+[![Coverage](https://img.shields.io/badge/Coverage-93.4%25-brightgreen)](https://jedi-knights.github.io/jk-mcp-nwsl/)
 [![Python](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
