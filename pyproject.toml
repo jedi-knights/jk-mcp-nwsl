@@ -1,6 +1,6 @@
 [project]
 name = "jk-mcp-nwsl"
-version = "0.1.4"
+version = "0.1.5"
 description = "MCP server for NWSL data via the ESPN public API"
 requires-python = ">=3.13"
 dependencies = [
