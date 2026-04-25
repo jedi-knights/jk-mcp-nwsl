@@ -62,3 +62,16 @@ jobs:
           MAJOR="v$(cut -d. -f1 VERSION)"
           git tag -fa "${MAJOR}" -m "Release ${MAJOR} (floating)"
           git push origin "${MAJOR}" --force
+
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly.io
+        run: |
+          if [ ! -f VERSION ]; then
+            echo "No new version released — skipping deployment."
+            exit 0
+          fi
+          flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
