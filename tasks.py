@@ -94,11 +94,7 @@ def test(ctx: Context, k: str | None = None, v: bool = False, x: bool = False) -
 def coverage(ctx: Context, report: str = "term-missing") -> None:
     """Run the pytest suite with coverage — fail if below COVERAGE_THRESHOLD."""
     result = ctx.run(
-        f"uv run pytest "
-        f"--cov=src/nwsl "
-        f"--cov-report={report} "
-        f"--cov-report=xml "
-        f"--cov-fail-under={COVERAGE_THRESHOLD}",
+        f"uv run pytest --cov=src/nwsl --cov-report={report} --cov-report=xml --cov-fail-under={COVERAGE_THRESHOLD}",
         warn=True,
     )
     if result and result.exited != 0:

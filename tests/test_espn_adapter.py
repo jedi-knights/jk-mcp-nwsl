@@ -131,9 +131,7 @@ def test_parse_standing_returns_none_without_team() -> None:
 
 
 async def test_get_teams_returns_team_list(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
-    mock_client.get.return_value.json.return_value = {
-        "sports": [{"leagues": [{"teams": [{"team": _RAW_TEAM}]}]}]
-    }
+    mock_client.get.return_value.json.return_value = {"sports": [{"leagues": [{"teams": [{"team": _RAW_TEAM}]}]}]}
     teams = await adapter.get_teams()
     assert len(teams) == 1
     assert teams[0].id == "1899"
@@ -165,11 +163,7 @@ async def test_get_scoreboard_without_date(adapter: ESPNAdapter, mock_client: As
 
 
 async def test_get_standings_returns_sorted_list(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
-    mock_client.get.return_value.json.return_value = {
-        "children": [
-            {"standings": {"entries": [_RAW_STANDING_ENTRY]}}
-        ]
-    }
+    mock_client.get.return_value.json.return_value = {"children": [{"standings": {"entries": [_RAW_STANDING_ENTRY]}}]}
     standings = await adapter.get_standings()
     assert len(standings) == 1
     assert standings[0].points == 38
