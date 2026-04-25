@@ -1,9 +1,9 @@
 name: Badge
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
 
 permissions:
   contents: write
@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   badge:
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
