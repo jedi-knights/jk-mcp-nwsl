@@ -5,13 +5,16 @@
 [![Python](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-An MCP server that exposes NWSL (National Women's Soccer League) data through the ESPN public API. No API key required.
+AI assistants like Claude are knowledgeable, but they have a hard cutoff date — they cannot tell you today's NWSL standings, last night's scores, or which teams are fighting for a playoff spot right now. This project fixes that.
+
+It is an **MCP server** — a plugin that gives Claude a direct connection to live NWSL data from the ESPN public API. Once installed, you can ask Claude natural-language questions about the National Women's Soccer League and get accurate, up-to-date answers. No subscription, no API key, and no knowledge of programming required to use it.
 
 ---
 
 ## Contents
 
 - [Tools](#tools)
+- [Example Prompts](#example-prompts)
 - [Requirements](#requirements)
 - [Quickstart](#quickstart)
 - [Configuration](#configuration)
@@ -34,6 +37,48 @@ An MCP server that exposes NWSL (National Women's Soccer League) data through th
 | `get_standings` | Get current league standings ordered by points |
 
 All tools are read-only, idempotent, and call the ESPN public API with automatic retry and in-process caching.
+
+---
+
+## Example Prompts
+
+Once the server is connected to Claude, try prompts like these.
+
+### Standings
+
+> Who is leading the NWSL standings right now?
+
+> Which teams are currently in a playoff position?
+
+> How does the bottom half of the NWSL table look?
+
+> Show me the full standings with goal differential.
+
+### Scores and results
+
+> What NWSL matches are scheduled for today?
+
+> What were the scores from this past weekend's NWSL games?
+
+> Show me all the NWSL results from June 15th, 2025.
+
+> Did the Portland Thorns win their most recent match?
+
+### Teams
+
+> List all the current NWSL teams.
+
+> What city does the team with abbreviation "NCC" play in?
+
+> Give me the ESPN ID for the Washington Spirit.
+
+### Multi-step
+
+> Which team is top of the table, and what was their last result?
+
+> How are the Portland Thorns doing in the standings, and what were their recent scores?
+
+> Which NWSL teams have the best goal differential, and who played on the most recent matchday?
 
 ---
 
@@ -101,13 +146,7 @@ Or add it manually to your project's `.claude/settings.json`:
 }
 ```
 
-Replace `/path/to/jk-mcp-nwsl` with the absolute path to your clone.
-
-Once connected, you can ask Claude things like:
-
-- *"What are the current NWSL standings?"*
-- *"What was the score of the Portland Thorns match on June 1st?"*
-- *"List all NWSL teams and their IDs."*
+Replace `/path/to/jk-mcp-nwsl` with the absolute path to your clone. See [Example Prompts](#example-prompts) for ideas on what to ask.
 
 ---
 
