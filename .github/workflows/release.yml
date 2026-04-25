@@ -59,11 +59,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
+      - uses: astral-sh/setup-uv@v8.1.0
+
       - name: Update version files
         run: |
           if [ -f VERSION ]; then
             NEW_VERSION=$(cat VERSION)
             sed -i "s/^version = \".*\"/version = \"${NEW_VERSION}\"/" pyproject.toml
+            uv lock
           fi
 
       - name: Commit generated files
@@ -72,7 +75,7 @@ jobs:
             echo "No new version released — nothing to commit."
             exit 0
           fi
-          git add VERSION pyproject.toml
+          git add VERSION pyproject.toml uv.lock
           if [ -f CHANGELOG.md ]; then git add CHANGELOG.md; fi
           git diff --cached --quiet || git commit -m "chore(release): update version files [skip ci]"
           git push origin HEAD:main
