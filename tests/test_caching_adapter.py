@@ -1,0 +1,76 @@
+"""Unit tests for CachingAdapter.
+
+Uses a synthetic clock so tests can simulate TTL expiry without sleeping.
+"""
+
+from unittest.mock import AsyncMock
+
+import pytest
+from pytest_mock import MockerFixture
+
+from nwsl.adapters.outbound.caching_adapter import CachingAdapter
+from nwsl.domain.models import Team
+from nwsl.ports.outbound import NWSLAPIPort
+
+
+@pytest.fixture
+def mock_inner(mocker: MockerFixture) -> AsyncMock:
+    return mocker.AsyncMock(spec=NWSLAPIPort)
+
+
+@pytest.fixture
+def clock() -> list[float]:
+    return [0.0]
+
+
+def make_clock(state: list[float]):
+    def _now() -> float:
+        return state[0]
+
+    return _now
+
+
+async def test_cache_hit_skips_inner_call(
+    mock_inner: AsyncMock,
+    portland_thorns: Team,
+    clock: list[float],
+) -> None:
+    adapter = CachingAdapter(mock_inner, ttl_seconds=60.0, now=make_clock(clock))
+    mock_inner.get_teams.return_value = [portland_thorns]
+
+    result1 = await adapter.get_teams()
+    result2 = await adapter.get_teams()
+
+    assert result1 == [portland_thorns]
+    assert result2 == [portland_thorns]
+    mock_inner.get_teams.assert_called_once()
+
+
+async def test_cache_miss_after_ttl_expiry(
+    mock_inner: AsyncMock,
+    portland_thorns: Team,
+    clock: list[float],
+) -> None:
+    adapter = CachingAdapter(mock_inner, ttl_seconds=30.0, now=make_clock(clock))
+    mock_inner.get_teams.return_value = [portland_thorns]
+
+    await adapter.get_teams()
+    clock[0] = 31.0
+    await adapter.get_teams()
+
+    assert mock_inner.get_teams.call_count == 2
+
+
+async def test_scoreboard_uses_shorter_ttl(
+    mock_inner: AsyncMock,
+    sample_match,
+    clock: list[float],
+) -> None:
+    adapter = CachingAdapter(mock_inner, ttl_seconds=300.0, scoreboard_ttl_seconds=60.0, now=make_clock(clock))
+    mock_inner.get_scoreboard.return_value = [sample_match]
+
+    await adapter.get_scoreboard("20250601")
+    clock[0] = 61.0
+    await adapter.get_scoreboard("20250601")
+
+    assert mock_inner.get_scoreboard.call_count == 2
