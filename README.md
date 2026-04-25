@@ -16,6 +16,7 @@ It is an **MCP server** — a plugin that gives Claude a direct connection to li
 
 - [Tools](#tools)
 - [Example Prompts](#example-prompts)
+- [Production](#production)
 - [Requirements](#requirements)
 - [Quickstart](#quickstart)
 - [Configuration](#configuration)
@@ -80,6 +81,58 @@ Once the server is connected to Claude, try prompts like these.
 > How are the Portland Thorns doing in the standings, and what were their recent scores?
 
 > Which NWSL teams have the best goal differential, and who played on the most recent matchday?
+
+---
+
+## Production
+
+A live instance of this server is already running at:
+
+```
+https://jk-mcp-nwsl.fly.dev/mcp
+```
+
+No installation, no Python, no cloning required. Connect your MCP client directly to the URL and you are done.
+
+### Claude Code
+
+```sh
+claude mcp add --transport http nwsl https://jk-mcp-nwsl.fly.dev/mcp
+```
+
+Or add it manually to your project's `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "nwsl": {
+      "type": "http",
+      "url": "https://jk-mcp-nwsl.fly.dev/mcp"
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+Add the following to your Claude Desktop configuration file.
+
+**Location:**
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "nwsl": {
+      "type": "streamable-http",
+      "url": "https://jk-mcp-nwsl.fly.dev/mcp"
+    }
+  }
+}
+```
+
+Restart Claude Desktop after saving. The NWSL tools will appear in the tool picker.
 
 ---
 
