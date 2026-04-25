@@ -14,6 +14,7 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  releases: write
 
 jobs:
   release:
@@ -34,7 +35,7 @@ jobs:
       - name: Run semantic release
         uses: jedi-knights/go-semantic-release@v0.10.0
         with:
-          github_token: ${{ secrets.GH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update version files
         run: |
