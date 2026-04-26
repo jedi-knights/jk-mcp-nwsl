@@ -47,8 +47,13 @@ It is an **MCP server** — a plugin that gives Claude direct access to live NWS
 | `get_news` | Get recent NWSL news articles |
 | `get_award_articles` | Get recent award announcements — Best XI, Player of the Month, Rookie of the Month |
 | `get_draft_articles` | Get NWSL draft articles, optionally filtered to a specific year |
+| `get_strength_of_schedule` | Get a team's average opponent points-per-game across matches already played |
+| `get_results_by_opponent_tier` | Split a team's W-L-T by current top, middle, and bottom standings tiers |
+| `get_adjusted_points_per_game` | Get a team's raw PPG alongside an opponent-quality-adjusted PPG |
 
 All tools are read-only and idempotent. Backed by three sources: the **ESPN public API** (teams, schedule, scores, league standings, news), the unofficial **SDP/Opta feed** that powers nwslsoccer.com (player stats, team aggregates, historical standings, Challenge Cup), and the **official NWSL CMS** (awards, draft articles). Endpoints and IDs were reverse-engineered from the public site's widget bundles — no auth required, but the SDP and CMS contracts are not officially documented; if a tool stops working the upstream format likely changed.
+
+The last three tools (`get_strength_of_schedule`, `get_results_by_opponent_tier`, `get_adjusted_points_per_game`) are **derived analytics** — pure functions over the live ESPN standings + team schedule that surface schedule-strength context the raw table doesn't show. They're inspired by NCAA RPI's idea of weighting results by opponent quality but adapted to the realities of a 16-team pro league (no non-conference adjustments, no opponent-of-opponent recursion, current standings used to define tiers).
 
 ---
 
@@ -129,6 +134,28 @@ Once the server is connected to Claude, try prompts like these.
 > Who was named NWSL Rookie of the Month?
 
 > Show me articles about the 2024 NWSL Draft.
+
+### Schedule strength and opponent quality
+
+> Which team has played the toughest schedule so far this season?
+
+> What's Portland's strength of schedule? List the opponents they've faced.
+
+> How does Bay FC stack up — have they played weak opponents or strong ones?
+
+> Show me Gotham's record against the current top 5 teams in the standings.
+
+> How has Kansas City Current done against the bottom of the table compared to the top?
+
+> Split Angel City's results into top, middle, and bottom standings tiers (use a tier size of 4).
+
+> Group Portland's opponents into top 3, middle, and bottom 3 — how do they stack up against the league extremes?
+
+> Compare San Diego and Seattle on adjusted points-per-game — who has earned their points the hard way?
+
+> Is Houston's record more impressive than the standings suggest, given who they've played?
+
+> What's the league average PPG and how does Washington's adjusted PPG compare?
 
 ### Multi-step
 

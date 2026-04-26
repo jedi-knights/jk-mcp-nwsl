@@ -7,19 +7,38 @@ about MCP, HTTP, or JSON — those are adapter concerns.
 import re
 
 from ..domain.models import (
+    AdjustedPointsPerGame,
     CMSArticle,
     Match,
     MatchDetails,
     NewsArticle,
+    OpponentPPG,
     Player,
     PlayerSeasonStat,
+    ResultsByOpponentTier,
     Season,
     SeasonStanding,
     Standing,
+    StrengthOfSchedule,
     Team,
     TeamSeasonStat,
 )
 from ..ports.outbound import CMSAPIPort, NWSLAPIPort, SDPAPIPort, SeasonDiscoveryPort
+from ._analytics_helpers import (
+    _build_ppg_index,
+    _build_tier_record,
+    _build_tier_specs,
+    _league_average_ppg,
+    _mean,
+    _opponent_ppgs,
+    _played_opponents,
+    _resolve_team,
+    _safe_ratio,
+    _self_record,
+    _tally_tier_results,
+    _validate_team_id,
+    _validate_tier_size,
+)
 from ._helpers import (
     _AWARD_TITLE_KEYWORDS,
     _DRAFT_TITLE_KEYWORDS,
@@ -253,6 +272,104 @@ class NWSLService:
         """
         season = await self._resolve_season(season_year)
         return await self._sdp.get_standings_for_season(season.id)
+
+    async def get_strength_of_schedule(self, team_id: str) -> StrengthOfSchedule:
+        """Return the average current PPG of opponents this team has faced.
+
+        Walks the team's completed matches and aggregates each opponent's
+        league-table points-per-game (no self-exclusion). Useful for "who has
+        played the tougher schedule so far?" questions.
+
+        Args:
+            team_id: ESPN numeric team ID.
+
+        Raises:
+            ValueError: If team_id is empty.
+            NWSLNotFoundError: If no team with that ID exists.
+        """
+        team_id = _validate_team_id(team_id)
+        standings = await self._repo.get_standings()
+        schedule = await self._repo.get_team_schedule(team_id)
+        ppg_index = _build_ppg_index(standings)
+        team = _resolve_team(standings, schedule, team_id)
+        opponents = [
+            OpponentPPG(
+                team=opp,
+                matches_played=ppg_index[opp.id].matches_played,
+                points=ppg_index[opp.id].points,
+                points_per_game=ppg_index[opp.id].ppg,
+            )
+            for opp in _played_opponents(schedule, team_id)
+            if opp.id in ppg_index
+        ]
+        return StrengthOfSchedule(
+            team=team,
+            matches_played=len(opponents),
+            opponents=opponents,
+            average_opponent_ppg=_mean([o.points_per_game for o in opponents]),
+        )
+
+    async def get_results_by_opponent_tier(self, team_id: str, tier_size: int = 5) -> ResultsByOpponentTier:
+        """Return W-L-T splits against current top-tier, middle, and bottom-tier teams.
+
+        Tiers are derived from the current league standings: the top `tier_size`,
+        the bottom `tier_size`, and everyone in between. Draws (no declared winner)
+        count as ties; matches against teams not in the current standings are
+        skipped.
+
+        Args:
+            team_id: ESPN numeric team ID.
+            tier_size: Number of teams in each of the top and bottom tiers.
+                Defaults to 5. Must be at least 1, and 2*tier_size must not
+                exceed the league size.
+
+        Raises:
+            ValueError: If team_id is empty or tier_size is invalid.
+            NWSLNotFoundError: If no team with that ID exists.
+        """
+        team_id = _validate_team_id(team_id)
+        standings = await self._repo.get_standings()
+        _validate_tier_size(tier_size, len(standings))
+        schedule = await self._repo.get_team_schedule(team_id)
+        rank_by_id = {s.team.id: i + 1 for i, s in enumerate(standings)}
+        team = _resolve_team(standings, schedule, team_id)
+        tier_specs = _build_tier_specs(tier_size, len(standings))
+        tally = _tally_tier_results(schedule, team_id, rank_by_id, tier_specs)
+        tiers = [_build_tier_record(name, low, high, tally) for name, low, high in tier_specs if high >= low]
+        return ResultsByOpponentTier(team=team, tier_size=tier_size, tiers=tiers)
+
+    async def get_adjusted_points_per_game(self, team_id: str) -> AdjustedPointsPerGame:
+        """Return raw PPG plus a schedule-strength-adjusted PPG.
+
+        Adjusted PPG = raw_ppg * (avg_opponent_ppg / league_average_ppg). Values
+        above raw_ppg mean the team has earned points against a tougher
+        schedule than league average.
+
+        Args:
+            team_id: ESPN numeric team ID.
+
+        Raises:
+            ValueError: If team_id is empty.
+            NWSLNotFoundError: If no team with that ID exists.
+        """
+        team_id = _validate_team_id(team_id)
+        standings = await self._repo.get_standings()
+        schedule = await self._repo.get_team_schedule(team_id)
+        ppg_index = _build_ppg_index(standings)
+        team = _resolve_team(standings, schedule, team_id)
+        matches_played, points, raw_ppg = _self_record(ppg_index, team_id)
+        opp_entries = _opponent_ppgs(schedule, team_id, ppg_index)
+        avg_opp_ppg = _mean([e.ppg for e in opp_entries])
+        league_avg = _league_average_ppg(standings)
+        return AdjustedPointsPerGame(
+            team=team,
+            matches_played=matches_played,
+            points=points,
+            raw_ppg=raw_ppg,
+            average_opponent_ppg=avg_opp_ppg,
+            league_average_ppg=league_avg,
+            adjusted_ppg=raw_ppg * _safe_ratio(avg_opp_ppg, league_avg),
+        )
 
     async def get_team_season_stats(
         self,
