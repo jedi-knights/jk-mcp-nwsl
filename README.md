@@ -206,13 +206,58 @@ Replace `/path/to/jk-mcp-nwsl` with the absolute path to your clone. See [Exampl
 
 ## Claude Desktop
 
-Add the following to your Claude Desktop configuration file.
+### Install Claude Desktop
 
-**Location:**
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+**With Homebrew (macOS):**
 
-**Using uv (recommended if you have the repo cloned):**
+```sh
+brew install --cask claude
+```
+
+**Without Homebrew:**
+
+Download the installer for your platform from [claude.ai/download](https://claude.ai/download) and follow the on-screen instructions:
+
+- macOS: open the downloaded `.dmg` and drag **Claude** into `/Applications`
+- Windows: run the downloaded `.exe` installer
+
+Launch Claude Desktop once and sign in before continuing — this creates the configuration directory referenced below.
+
+### Configure Claude Desktop to use this MCP server
+
+Pick the option that matches how you want to run the server: **hosted** (no install), **uv** (local clone), or **Docker** (containerized). Then follow the four steps below.
+
+#### 1. Open the Claude Desktop config file
+
+The fastest way is from inside Claude Desktop: **Settings → Developer → Edit Config**. This opens (and creates, if needed) the file in your default editor.
+
+You can also open it directly:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+If the file does not exist yet, create it with `{}` as its contents.
+
+#### 2. Add the `nwsl` server entry
+
+Merge **one** of the following snippets into the top-level `mcpServers` object. If `mcpServers` does not exist, add the whole block as shown.
+
+**Option A — Hosted (easiest, no install):**
+
+```json
+{
+  "mcpServers": {
+    "nwsl": {
+      "type": "streamable-http",
+      "url": "https://jk-mcp-nwsl.fly.dev/mcp"
+    }
+  }
+}
+```
+
+**Option B — Local clone with `uv`:**
+
+Replace `/path/to/jk-mcp-nwsl` with the absolute path to your clone. If `uv` is not on Claude Desktop's `PATH`, use the absolute path to the binary (`which uv` will show it — typically `/opt/homebrew/bin/uv` on Apple Silicon or `/usr/local/bin/uv` on Intel Macs).
 
 ```json
 {
@@ -229,7 +274,9 @@ Add the following to your Claude Desktop configuration file.
 }
 ```
 
-**Using Docker:**
+**Option C — Docker:**
+
+Build the image first (see [Docker](#docker)), then:
 
 ```json
 {
@@ -242,7 +289,18 @@ Add the following to your Claude Desktop configuration file.
 }
 ```
 
-Restart Claude Desktop after saving the config. The NWSL tools will appear in the tool picker.
+#### 3. Save and fully restart Claude Desktop
+
+Quit Claude Desktop completely (**⌘Q** on macOS, or right-click the tray icon → **Quit** on Windows) and relaunch it. A simple window close is not enough — the MCP servers are only loaded on launch.
+
+#### 4. Verify the connection
+
+Open a new chat and click the tools / plug icon in the message bar. You should see **nwsl** listed with four tools: `get_teams`, `get_team`, `get_scoreboard`, `get_standings`. Try a prompt from [Example Prompts](#example-prompts) to confirm it works end-to-end.
+
+If the server does not appear, check the Claude Desktop logs:
+
+- **macOS:** `~/Library/Logs/Claude/mcp*.log`
+- **Windows:** `%APPDATA%\Claude\logs\mcp*.log`
 
 ---
 
