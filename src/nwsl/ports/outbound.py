@@ -111,8 +111,8 @@ class SeasonDiscoveryPort(Protocol):
 class CMSAPIPort(Protocol):
     """Contract for the official site's content API (dapi.nwslsoccer.com).
 
-    Used by the awards and draft tools to surface editorial content the
-    structured stats APIs don't expose.
+    Used by the awards tool to surface editorial content the structured stats
+    APIs don't expose.
     """
 
     async def get_recent_stories(self, limit: int) -> list[CMSArticle]:

@@ -1,8 +1,8 @@
 """Tests for the CMS adapter (dapi.nwslsoccer.com).
 
 The CMS adapter fetches articles from the official site's content API. Used by
-the awards and draft tools, which filter the article list client-side by title
-patterns since the CMS's $filter param is silently ignored.
+the awards tool, which filters the article list client-side by title patterns
+since the CMS's $filter param is silently ignored.
 """
 
 from unittest.mock import AsyncMock, MagicMock

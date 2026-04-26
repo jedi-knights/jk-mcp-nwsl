@@ -87,7 +87,7 @@ def _parse_match(event: dict[str, Any]) -> Match:
         date=event.get("date", ""),
         name=event.get("name", ""),
         short_name=event.get("shortName", ""),
-        status_type=status_type.get("name", ""),
+        status_type=status_type.get("state", ""),
         status_detail=status.get("displayClock", status_type.get("description", "")),
         competitors=competitors,
     )

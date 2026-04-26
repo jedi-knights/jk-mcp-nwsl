@@ -35,7 +35,7 @@ _RAW_EVENT = {
         {
             "status": {
                 "displayClock": "FT",
-                "type": {"name": "post", "description": "Final"},
+                "type": {"name": "STATUS_FULL_TIME", "state": "post", "description": "Final"},
             },
             "competitors": [
                 {
@@ -185,6 +185,39 @@ def test_parse_match_maps_fields() -> None:
     assert match.competitors[0].winner is True
 
 
+def test_parse_match_status_type_uses_state_not_name() -> None:
+    """status_type must come from ESPN's `state` field ("pre"/"in"/"post"), not `name`.
+
+    The `name` field is a verbose label like "STATUS_FULL_TIME"; the analytics
+    helpers (and Match docstring) require the short state value. Reading `name`
+    silently broke every schedule-strength tool because matches never matched
+    the "post" filter.
+    """
+    event = {
+        "id": "401853883",
+        "date": "2026-04-04T22:30Z",
+        "name": "POR at NC",
+        "shortName": "POR @ NC",
+        "competitions": [
+            {
+                "status": {
+                    "displayClock": "90'+5'",
+                    "type": {
+                        "name": "STATUS_FULL_TIME",
+                        "state": "post",
+                        "completed": True,
+                        "description": "Full Time",
+                        "shortDetail": "FT",
+                    },
+                },
+                "competitors": [],
+            }
+        ],
+    }
+    match = _parse_match(event)
+    assert match.status_type == "post"
+
+
 def test_parse_match_extracts_score_from_ref_dict() -> None:
     """The team-schedule endpoint returns scores as $ref dicts; we must extract displayValue.
 
@@ -202,7 +235,7 @@ def test_parse_match_extracts_score_from_ref_dict() -> None:
             {
                 "status": {
                     "displayClock": "FT",
-                    "type": {"name": "post", "description": "Full Time"},
+                    "type": {"name": "STATUS_FULL_TIME", "state": "post", "description": "Full Time"},
                 },
                 "competitors": [
                     {

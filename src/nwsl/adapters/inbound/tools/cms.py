@@ -1,11 +1,11 @@
-"""CMS-backed MCP tools — awards and draft articles scraped from the official site."""
+"""CMS-backed MCP tools — award articles scraped from the official site."""
 
 import logging
 
 from mcp.server.fastmcp import FastMCP
 
 from ....application.service import NWSLService
-from ..formatters import _fmt_award_articles, _fmt_draft_articles
+from ..formatters import _fmt_award_articles
 from ._base import _READ_ANNOTATIONS, _safe_call
 
 logger = logging.getLogger(__name__)
@@ -28,18 +28,3 @@ def register_cms_tools(mcp: FastMCP, service: NWSLService) -> None:
         """
         logger.info("tool=get_award_articles limit=%r", limit)
         return await _safe_call(service.get_award_articles(limit), _fmt_award_articles)
-
-    @mcp.tool(annotations=_READ_ANNOTATIONS)
-    async def get_draft_articles(year: int | None = None, limit: int = 10) -> str:
-        """Get NWSL draft articles, optionally filtered to a year.
-
-        Draft results are CMS articles, not a structured endpoint. The year
-        filter matches articles whose title contains that year — best for
-        recent drafts (2022 onward).
-
-        Args:
-            year: Calendar year (e.g. 2025). Omit to fetch any draft articles.
-            limit: Maximum number of articles to return (default 10).
-        """
-        logger.info("tool=get_draft_articles year=%r limit=%r", year, limit)
-        return await _safe_call(service.get_draft_articles(year, limit), _fmt_draft_articles)

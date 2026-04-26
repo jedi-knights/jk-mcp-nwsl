@@ -58,6 +58,7 @@ def _fmt_match(match: Match) -> str:
     competitor_lines = "\n  ".join(_fmt_competitor(c) for c in match.competitors)
     return (
         f"Match: {match.name}\n"
+        f"  ID: {match.id}\n"
         f"  Date: {match.date}\n"
         f"  Status: {match.status_detail}\n"
         f"  Competitors:\n  {competitor_lines}"
@@ -232,13 +233,6 @@ def _fmt_award_articles(articles: list[CMSArticle]) -> str:
     """Format the awards-articles list."""
     if not articles:
         return "No recent award articles found."
-    return "\n\n".join(_fmt_cms_article(i, a) for i, a in enumerate(articles, 1))
-
-
-def _fmt_draft_articles(articles: list[CMSArticle]) -> str:
-    """Format the draft-articles list."""
-    if not articles:
-        return "No recent draft articles found."
     return "\n\n".join(_fmt_cms_article(i, a) for i, a in enumerate(articles, 1))
 
 

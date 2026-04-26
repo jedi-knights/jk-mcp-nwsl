@@ -110,8 +110,8 @@ class CMSArticle:
 
     Distinct from `NewsArticle` (sourced from ESPN) — the two CMS systems
     use different IDs, slugs, and lifecycles. CMSArticle carries the
-    public-site URL and the editorial tag list, which is how the awards/draft
-    tools filter to relevant stories.
+    public-site URL and the editorial tag list, which is how the awards
+    tool filters to relevant stories.
     """
 
     slug: str
