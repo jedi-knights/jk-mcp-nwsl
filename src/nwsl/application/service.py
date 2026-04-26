@@ -4,8 +4,6 @@ This layer orchestrates work by delegating to outbound ports. It knows nothing
 about MCP, HTTP, or JSON — those are adapter concerns.
 """
 
-import re
-
 from ..domain.models import (
     AdjustedPointsPerGame,
     CMSArticle,
@@ -41,7 +39,6 @@ from ._analytics_helpers import (
 )
 from ._helpers import (
     _AWARD_TITLE_KEYWORDS,
-    _DRAFT_TITLE_KEYWORDS,
     _MAX_CMS_FETCH,
     _matches_keywords,
     _select_season,
@@ -202,29 +199,6 @@ class NWSLService:
             raise ValueError("limit must be positive")
         season = await self._resolve_season(season_year)
         return await self._sdp.get_player_stats(season.id, sort_by, limit)
-
-    async def get_draft_articles(self, year: int | None = None, limit: int = 10) -> list[CMSArticle]:
-        """Return recent NWSL draft articles, optionally filtered to a specific year.
-
-        Draft results are published as CMS articles. Filtering by year matches
-        articles whose title mentions that year — useful for "2025 draft picks"
-        but not exhaustive (some articles omit the year in the title).
-
-        Args:
-            year: Calendar year (e.g. 2025). Omit for all draft articles.
-            limit: Maximum number of articles to return.
-
-        Raises:
-            ValueError: If limit is not positive.
-        """
-        if limit <= 0:
-            raise ValueError("limit must be positive")
-        articles = await self._cms.get_recent_stories(_MAX_CMS_FETCH)
-        matches = [a for a in articles if _matches_keywords(a.title, _DRAFT_TITLE_KEYWORDS)]
-        if year is not None:
-            year_pattern = re.compile(rf"\b{year}\b")
-            matches = [a for a in matches if year_pattern.search(a.title)]
-        return matches[:limit]
 
     async def get_award_articles(self, limit: int = 10) -> list[CMSArticle]:
         """Return recent NWSL award-related articles.

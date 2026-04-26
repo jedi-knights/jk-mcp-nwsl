@@ -95,6 +95,18 @@ def test_fmt_scoreboard_shows_score(sample_match: Match) -> None:
     assert "FT" in result
 
 
+def test_fmt_scoreboard_shows_match_id(sample_match: Match) -> None:
+    """get_match_details requires the match ID, so the listing must surface it."""
+    result = _fmt_scoreboard([sample_match])
+    assert sample_match.id in result
+
+
+def test_fmt_team_schedule_shows_match_id(sample_match: Match) -> None:
+    """get_match_details requires the match ID, so the listing must surface it."""
+    result = _fmt_team_schedule([sample_match])
+    assert sample_match.id in result
+
+
 def test_fmt_player_leaderboards_empty() -> None:
     assert "No players" in _fmt_player_leaderboards([], sort_by="goals")
 

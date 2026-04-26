@@ -311,58 +311,6 @@ async def test_get_player_leaderboards_rejects_non_positive_limit(
     mock_discovery.get_seasons.assert_not_called()
 
 
-async def test_get_draft_articles_filters_by_keyword(
-    nwsl_service: NWSLService,
-    mock_cms: AsyncMock,
-) -> None:
-    draft = CMSArticle(
-        slug="2025-draft",
-        title="2025 NWSL Draft: Round 1 picks",
-        summary="",
-        published="",
-        link="",
-    )
-    other = CMSArticle(slug="x", title="Other story", summary="", published="", link="")
-    mock_cms.get_recent_stories.return_value = [draft, other]
-    result = await nwsl_service.get_draft_articles()
-    assert result == [draft]
-
-
-async def test_get_draft_articles_filters_by_year(
-    nwsl_service: NWSLService,
-    mock_cms: AsyncMock,
-) -> None:
-    d2024 = CMSArticle(slug="a", title="2024 NWSL Draft results", summary="", published="", link="")
-    d2025 = CMSArticle(slug="b", title="2025 NWSL Draft results", summary="", published="", link="")
-    mock_cms.get_recent_stories.return_value = [d2024, d2025]
-    result = await nwsl_service.get_draft_articles(year=2025)
-    assert result == [d2025]
-
-
-async def test_get_draft_articles_year_filter_uses_word_boundaries(
-    nwsl_service: NWSLService,
-    mock_cms: AsyncMock,
-) -> None:
-    """A title containing '20250' or 'pre-2025' should not match year=2025
-    via naive substring matching."""
-    longer_number = CMSArticle(slug="a", title="NWSL Draft attendance hits 20250", summary="", published="", link="")
-    target = CMSArticle(slug="b", title="NWSL 2025 Draft picks announced", summary="", published="", link="")
-    mock_cms.get_recent_stories.return_value = [longer_number, target]
-    result = await nwsl_service.get_draft_articles(year=2025)
-    assert result == [target]
-
-
-@pytest.mark.parametrize("bad_limit", [0, -1])
-async def test_get_draft_articles_rejects_non_positive_limit(
-    nwsl_service: NWSLService,
-    mock_cms: AsyncMock,
-    bad_limit: int,
-) -> None:
-    with pytest.raises(ValueError, match="positive"):
-        await nwsl_service.get_draft_articles(limit=bad_limit)
-    mock_cms.get_recent_stories.assert_not_called()
-
-
 async def test_get_award_articles_filters_by_title_keywords(
     nwsl_service: NWSLService,
     mock_cms: AsyncMock,

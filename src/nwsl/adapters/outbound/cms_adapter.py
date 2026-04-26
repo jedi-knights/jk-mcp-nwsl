@@ -1,8 +1,8 @@
 """CMS adapter for the official NWSL site's content API (dapi.nwslsoccer.com).
 
-The CMS exposes editorial articles — stories about awards, draft, transactions,
+The CMS exposes editorial articles — stories about awards, transactions,
 match recaps, etc. The `$filter` query param is silently ignored, so callers
-must filter the returned list client-side. Used by the awards and draft tools.
+must filter the returned list client-side. Used by the awards tool.
 """
 
 import logging

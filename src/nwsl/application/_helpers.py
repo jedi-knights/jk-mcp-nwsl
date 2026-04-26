@@ -22,11 +22,9 @@ _AWARD_TITLE_KEYWORDS: tuple[str, ...] = (
     "mvp",
 )
 
-_DRAFT_TITLE_KEYWORDS: tuple[str, ...] = ("draft",)
-
 # Cap on stories pulled before client-side filtering. The CMS returns ~25 per
 # page; we sweep up to ~100 recent stories which is enough for current-season
-# awards/draft coverage without hammering the API.
+# award coverage without hammering the API.
 _MAX_CMS_FETCH = 100
 
 
