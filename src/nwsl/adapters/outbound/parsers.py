@@ -29,19 +29,46 @@ def _parse_team(raw: dict[str, Any]) -> Team:
     )
 
 
+def _extract_score(raw_score: object) -> str | None:
+    """Pull a clean score string out of either ESPN serialization shape.
+
+    The scoreboard endpoint returns `score` as a primitive (e.g. `2`), but the
+    team-schedule endpoint returns it as a $ref dict like
+    `{'$ref': '...', 'value': 2.0, 'displayValue': '2', 'winner': False, ...}`.
+    We prefer `displayValue`, fall back to `value`, and stringify primitives.
+    """
+    if raw_score is None:
+        return None
+    if isinstance(raw_score, dict):
+        display = raw_score.get("displayValue")
+        if display is not None:
+            return str(display)
+        value = raw_score.get("value")
+        return str(int(value)) if isinstance(value, int | float) else None
+    return str(raw_score)
+
+
+def _extract_winner(raw_score: object, raw_winner: object) -> bool | None:
+    """Pull `winner` from the competitor, falling back to the embedded score dict."""
+    if raw_winner is not None:
+        return bool(raw_winner)
+    if isinstance(raw_score, dict) and raw_score.get("winner") is not None:
+        return bool(raw_score.get("winner"))
+    return None
+
+
 def _parse_competitor(raw: dict[str, Any]) -> MatchCompetitor:
     """Map a raw ESPN competitor object to a domain MatchCompetitor.
 
     Args:
-        raw: A competitor dict from a scoreboard event.
+        raw: A competitor dict from a scoreboard event or team-schedule event.
     """
     score = raw.get("score")
-    winner = raw.get("winner")
     return MatchCompetitor(
         team=_parse_team(raw),
         home_away=raw.get("homeAway", ""),
-        score=str(score) if score is not None else None,
-        winner=bool(winner) if winner is not None else None,
+        score=_extract_score(score),
+        winner=_extract_winner(score, raw.get("winner")),
     )
 
 
