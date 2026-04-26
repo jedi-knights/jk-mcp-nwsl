@@ -6,17 +6,21 @@ without spinning up a full MCP server.
 
 from pytest_mock import MockerFixture
 
-from nwsl.adapters.inbound.mcp_adapter import (
+from nwsl.adapters.inbound.formatters import (
+    _fmt_match_details,
+    _fmt_news,
+    _fmt_player_leaderboards,
+    _fmt_roster,
     _fmt_scoreboard,
     _fmt_standings,
     _fmt_team,
+    _fmt_team_schedule,
     _fmt_teams,
-    _safe_call,
-    create_mcp_server,
 )
+from nwsl.adapters.inbound.mcp_adapter import _safe_call, create_mcp_server
 from nwsl.application.service import NWSLService
 from nwsl.domain.exceptions import NWSLNotFoundError, UpstreamAPIError
-from nwsl.domain.models import Match, Standing, Team
+from nwsl.domain.models import Match, MatchDetails, NewsArticle, Player, PlayerSeasonStat, Standing, Team
 
 
 async def test_safe_call_returns_formatted_result(portland_thorns: Team) -> None:
@@ -72,6 +76,66 @@ def test_fmt_scoreboard_shows_score(sample_match: Match) -> None:
     result = _fmt_scoreboard([sample_match])
     assert "Portland Thorns FC" in result
     assert "2" in result
+    assert "FT" in result
+
+
+def test_fmt_player_leaderboards_empty() -> None:
+    assert "No players" in _fmt_player_leaderboards([], sort_by="goals")
+
+
+def test_fmt_player_leaderboards_shows_sort_stat(sample_player_season_stat: PlayerSeasonStat) -> None:
+    result = _fmt_player_leaderboards([sample_player_season_stat], sort_by="goals")
+    assert "Barbra Banda" in result
+    assert "Orlando Pride" in result
+    assert "5" in result  # goal count
+    assert "goals" in result.lower()
+
+
+def test_fmt_news_empty() -> None:
+    assert "No news" in _fmt_news([])
+
+
+def test_fmt_news_lists_articles(sample_article: NewsArticle) -> None:
+    result = _fmt_news([sample_article])
+    assert "Chicago Stars" in result
+    assert "2026-04-26" in result
+    assert "espn.com" in result
+
+
+def test_fmt_roster_empty() -> None:
+    assert "No players" in _fmt_roster([])
+
+
+def test_fmt_roster_lists_players(sample_player: Player) -> None:
+    result = _fmt_roster([sample_player])
+    assert "Mackenzie Arnold" in result
+    assert "#18" in result
+    assert "Goalkeeper" in result
+    assert "Australia" in result
+
+
+def test_fmt_match_details_includes_teams_score_venue(sample_match_details: MatchDetails) -> None:
+    result = _fmt_match_details(sample_match_details)
+    assert "North Carolina Courage" in result
+    assert "Portland Thorns FC" in result
+    assert "2 - 2" in result
+    assert "WakeMed Soccer Park" in result
+    assert "7,018" in result or "7018" in result
+
+
+def test_fmt_match_details_lists_key_events(sample_match_details: MatchDetails) -> None:
+    result = _fmt_match_details(sample_match_details)
+    assert "12'" in result
+    assert "Reilyn Turner" in result
+
+
+def test_fmt_team_schedule_empty() -> None:
+    assert "No scheduled matches" in _fmt_team_schedule([])
+
+
+def test_fmt_team_schedule_lists_matches(sample_match: Match) -> None:
+    result = _fmt_team_schedule([sample_match])
+    assert "Portland Thorns FC" in result
     assert "FT" in result
 
 

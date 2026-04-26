@@ -30,8 +30,13 @@ from mcp.server.fastmcp import FastMCP
 
 from .adapters.inbound.mcp_adapter import create_mcp_server
 from .adapters.outbound.caching_adapter import CachingAdapter
+from .adapters.outbound.cms_adapter import CMSAdapter
 from .adapters.outbound.espn_adapter import ESPNAdapter
 from .adapters.outbound.retry_adapter import RetryingAdapter
+from .adapters.outbound.sdp_adapter import SDPAdapter
+from .adapters.outbound.sdp_caching_adapter import SDPCachingAdapter
+from .adapters.outbound.sdp_retry_adapter import SDPRetryingAdapter
+from .adapters.outbound.season_discovery import SeasonDiscoveryAdapter
 from .application.service import NWSLService
 
 
@@ -96,7 +101,15 @@ def build_server(
     # Compose cross-cutting adapters: HTTP → retry on transient errors → cache results.
     retrying = RetryingAdapter(adapter)
     caching = CachingAdapter(retrying)
-    service = NWSLService(repo=caching)
+
+    sdp_adapter = SDPAdapter()
+    sdp_retrying = SDPRetryingAdapter(sdp_adapter)
+    sdp_caching = SDPCachingAdapter(sdp_retrying)
+
+    discovery = SeasonDiscoveryAdapter()
+    cms = CMSAdapter()
+
+    service = NWSLService(repo=caching, sdp=sdp_caching, discovery=discovery, cms=cms)
     return create_mcp_server(service, host=host, port=port)
 
 

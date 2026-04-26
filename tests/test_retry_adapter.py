@@ -47,6 +47,38 @@ async def test_raises_after_max_attempts(mock_inner: AsyncMock) -> None:
     assert mock_inner.get_teams.call_count == 2
 
 
+async def test_get_news_retries_on_upstream_error(mock_inner: AsyncMock, sample_article) -> None:
+    adapter = RetryingAdapter(mock_inner, max_attempts=3, sleep=_no_sleep)
+    mock_inner.get_news.side_effect = [UpstreamAPIError("503"), [sample_article]]
+    result = await adapter.get_news(5)
+    assert result == [sample_article]
+    assert mock_inner.get_news.call_count == 2
+
+
+async def test_get_roster_retries_on_upstream_error(mock_inner: AsyncMock, sample_player) -> None:
+    adapter = RetryingAdapter(mock_inner, max_attempts=3, sleep=_no_sleep)
+    mock_inner.get_roster.side_effect = [UpstreamAPIError("503"), [sample_player]]
+    result = await adapter.get_roster("15362")
+    assert result == [sample_player]
+    assert mock_inner.get_roster.call_count == 2
+
+
+async def test_get_match_details_retries_on_upstream_error(mock_inner: AsyncMock, sample_match_details) -> None:
+    adapter = RetryingAdapter(mock_inner, max_attempts=3, sleep=_no_sleep)
+    mock_inner.get_match_details.side_effect = [UpstreamAPIError("503"), sample_match_details]
+    result = await adapter.get_match_details("401853883")
+    assert result == sample_match_details
+    assert mock_inner.get_match_details.call_count == 2
+
+
+async def test_get_team_schedule_retries_on_upstream_error(mock_inner: AsyncMock, sample_match) -> None:
+    adapter = RetryingAdapter(mock_inner, max_attempts=3, sleep=_no_sleep)
+    mock_inner.get_team_schedule.side_effect = [UpstreamAPIError("503"), [sample_match]]
+    result = await adapter.get_team_schedule("1899")
+    assert result == [sample_match]
+    assert mock_inner.get_team_schedule.call_count == 2
+
+
 async def test_not_found_is_not_retried(mock_inner: AsyncMock) -> None:
     adapter = RetryingAdapter(mock_inner, max_attempts=3, sleep=_no_sleep)
     mock_inner.get_team.side_effect = NWSLNotFoundError("Team not found: 9999")

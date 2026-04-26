@@ -8,7 +8,7 @@
 
 AI assistants like Claude are knowledgeable, but they have a hard cutoff date — they cannot tell you today's NWSL standings, last night's scores, or which teams are fighting for a playoff spot right now. This project fixes that.
 
-It is an **MCP server** — a plugin that gives Claude a direct connection to live NWSL data from the ESPN public API. Once installed, you can ask Claude natural-language questions about the National Women's Soccer League and get accurate, up-to-date answers. No subscription, no API key, and no knowledge of programming required to use it.
+It is an **MCP server** — a plugin that gives Claude direct access to live NWSL data: scores, standings, rosters, player and team stats, historical seasons, awards, and more. Once installed, you can ask Claude natural-language questions about the National Women's Soccer League and get accurate, up-to-date answers. No subscription, no API key, and no knowledge of programming required to use it.
 
 ---
 
@@ -34,11 +34,21 @@ It is an **MCP server** — a plugin that gives Claude a direct connection to li
 | Tool | Description |
 |---|---|
 | `get_teams` | List all active NWSL teams with IDs and abbreviations |
-| `get_team` | Get details for a specific team by ESPN team ID |
-| `get_scoreboard` | Get match scores, optionally filtered by date (`YYYYMMDD`) |
-| `get_standings` | Get current league standings ordered by points |
+| `get_team` | Get details for a specific team |
+| `get_roster` | Get a team's active roster — jersey numbers, positions, ages, citizenships |
+| `get_scoreboard` | Get match scores for a single day, a date range, or the current matchweek |
+| `get_team_schedule` | Get every match for a team in the current season — past results and upcoming fixtures |
+| `get_match_details` | Get one match's full details — score, venue, attendance, goals, substitutions, cards |
+| `get_standings` | Get current NWSL league standings |
+| `get_historical_standings` | Get final standings for any prior season (2016 onward) |
+| `get_challenge_cup_standings` | Get NWSL Challenge Cup standings for any year (2020 onward) |
+| `get_player_leaderboards` | Get top players ranked by any stat — goals, assists, saves, xG, etc. |
+| `get_team_season_stats` | Get team season aggregates ranked by any stat — points, goals, possession, etc. |
+| `get_news` | Get recent NWSL news articles |
+| `get_award_articles` | Get recent award announcements — Best XI, Player of the Month, Rookie of the Month |
+| `get_draft_articles` | Get NWSL draft articles, optionally filtered to a specific year |
 
-All tools are read-only, idempotent, and call the ESPN public API with automatic retry and in-process caching.
+All tools are read-only and idempotent. Backed by three sources: the **ESPN public API** (teams, schedule, scores, league standings, news), the unofficial **SDP/Opta feed** that powers nwslsoccer.com (player stats, team aggregates, historical standings, Challenge Cup), and the **official NWSL CMS** (awards, draft articles). Endpoints and IDs were reverse-engineered from the public site's widget bundles — no auth required, but the SDP and CMS contracts are not officially documented; if a tool stops working the upstream format likely changed.
 
 ---
 
@@ -52,9 +62,13 @@ Once the server is connected to Claude, try prompts like these.
 
 > Which teams are currently in a playoff position?
 
-> How does the bottom half of the NWSL table look?
-
 > Show me the full standings with goal differential.
+
+> Who won the 2018 NWSL Regular Season?
+
+> What were the final 2017 standings?
+
+> Show me the 2022 NWSL Challenge Cup standings.
 
 ### Scores and results
 
@@ -66,21 +80,65 @@ Once the server is connected to Claude, try prompts like these.
 
 > Did the Portland Thorns win their most recent match?
 
-### Teams
+> When does Bay FC play next?
+
+### Match details
+
+> Who scored in the most recent Portland-Carolina match?
+
+> What was the attendance at Denver's home opener?
+
+> Show me all the goals, cards, and substitutions from the most recent Gotham match.
+
+> Who got the assists on Angel City's goals last weekend?
+
+### Teams and rosters
 
 > List all the current NWSL teams.
 
-> What city does the team with abbreviation "NCC" play in?
+> Who's on the Portland Thorns roster?
+
+> Which Angel City players are international?
+
+> Show me Kansas City Current's goalkeepers.
 
 > Give me the ESPN ID for the Washington Spirit.
 
+### Player and team statistics
+
+> Who is the top scorer in the NWSL right now?
+
+> Which player has the most assists this season?
+
+> Show me the top 10 NWSL players by minutes played.
+
+> Who leads the league in saves?
+
+> Which NWSL team has the best passing accuracy this season?
+
+> Compare Portland and Kansas City by points and goals scored this season.
+
+### News, awards, and draft
+
+> What's the latest NWSL news?
+
+> Who won March Player of the Month?
+
+> Show me the most recent Best XI of the Month.
+
+> Who was named NWSL Rookie of the Month?
+
+> Show me articles about the 2024 NWSL Draft.
+
 ### Multi-step
 
-> Which team is top of the table, and what was their last result?
+> Who is the top scorer in the NWSL right now, and what was their team's last match result?
 
-> How are the Portland Thorns doing in the standings, and what were their recent scores?
+> How are the Portland Thorns doing in the standings, and who scored their last goal?
 
-> Which NWSL teams have the best goal differential, and who played on the most recent matchday?
+> Compare the 2024 NWSL champion to the 2018 NWSL champion — same franchise, or different?
+
+> Which team currently leads the league, and what's their roster's average age?
 
 ---
 

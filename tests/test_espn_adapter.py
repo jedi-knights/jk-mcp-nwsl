@@ -9,7 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from nwsl.adapters.outbound.espn_adapter import ESPNAdapter, _parse_match, _parse_standing, _parse_team
+from nwsl.adapters.outbound.espn_adapter import ESPNAdapter
+from nwsl.adapters.outbound.parsers import _parse_match, _parse_standing, _parse_team
 from nwsl.domain.exceptions import NWSLNotFoundError, UpstreamAPIError
 
 # ---------------------------------------------------------------------------
@@ -65,6 +66,78 @@ _RAW_STANDING_ENTRY = {
         {"name": "pointsAgainst", "value": 18},
         {"name": "pointDifferential", "value": 22},
     ],
+}
+
+
+_RAW_SUMMARY = {
+    "header": {
+        "id": "401853883",
+        "competitions": [
+            {
+                "date": "2026-04-04T22:30Z",
+                "status": {
+                    "displayClock": "FT",
+                    "type": {"name": "STATUS_FULL_TIME", "description": "Full Time"},
+                },
+                "competitors": [
+                    {
+                        "homeAway": "home",
+                        "score": "2",
+                        "winner": False,
+                        "team": {**_RAW_TEAM, "id": "2695", "displayName": "North Carolina Courage"},
+                    },
+                    {
+                        "homeAway": "away",
+                        "score": "2",
+                        "winner": False,
+                        "team": _RAW_TEAM,
+                    },
+                ],
+            }
+        ],
+    },
+    "gameInfo": {
+        "venue": {"fullName": "WakeMed Soccer Park", "address": {"city": "Cary, North Carolina"}},
+        "attendance": 7018,
+    },
+    "keyEvents": [
+        {
+            "type": {"type": "goal---header"},
+            "scoringPlay": True,
+            "period": {"number": 1},
+            "clock": {"displayValue": "12'"},
+            "text": "Goal! NC 0, POR 1. Reilyn Turner.",
+            "team": {"displayName": "Portland Thorns FC"},
+        },
+        {
+            "type": {"type": "yellow-card"},
+            "scoringPlay": False,
+            "period": {"number": 2},
+            "clock": {"displayValue": "84'"},
+            "text": "Castellanos shown the yellow card.",
+            "team": {"displayName": "Portland Thorns FC"},
+        },
+    ],
+}
+
+
+_RAW_ARTICLE = {
+    "id": 48595550,
+    "type": "Story",
+    "headline": "Chicago Stars vs. Boston Legacy FC - Game Highlights",
+    "description": "Watch the Game Highlights from Chicago Stars vs. Boston Legacy FC, 04/26/2026",
+    "published": "2026-04-26T00:48:46Z",
+    "links": {"web": {"href": "https://www.espn.com/video/clip?id=48595550"}},
+}
+
+
+_RAW_PLAYER = {
+    "id": "219821",
+    "fullName": "Mackenzie Arnold",
+    "jersey": "18",
+    "position": {"displayName": "Goalkeeper", "abbreviation": "G"},
+    "citizenship": "Australia",
+    "age": 32,
 }
 
 
@@ -162,11 +235,131 @@ async def test_get_scoreboard_without_date(adapter: ESPNAdapter, mock_client: As
     assert matches == []
 
 
+async def test_get_scoreboard_with_date_range(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value.json.return_value = {"events": [_RAW_EVENT]}
+    matches = await adapter.get_scoreboard("20260404", end_date="20260405")
+    assert len(matches) == 1
+    sent_params = mock_client.get.call_args.kwargs.get("params", {})
+    assert sent_params.get("dates") == "20260404-20260405"
+
+
+async def test_get_news_returns_articles(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value.json.return_value = {"articles": [_RAW_ARTICLE]}
+    articles = await adapter.get_news(limit=5)
+    assert len(articles) == 1
+    a = articles[0]
+    assert a.id == "48595550"
+    assert a.headline.startswith("Chicago Stars")
+    assert a.published == "2026-04-26T00:48:46Z"
+    assert a.link == "https://www.espn.com/video/clip?id=48595550"
+
+
+async def test_get_news_passes_limit(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value.json.return_value = {"articles": []}
+    await adapter.get_news(limit=10)
+    call = mock_client.get.call_args
+    assert "/news" in call.args[0]
+    assert call.kwargs.get("params", {}).get("limit") == 10
+
+
+async def test_get_news_handles_missing_link(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    article = {**_RAW_ARTICLE, "links": {}}
+    mock_client.get.return_value.json.return_value = {"articles": [article]}
+    articles = await adapter.get_news(limit=5)
+    assert articles[0].link is None
+
+
+async def test_get_roster_returns_players(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value.json.return_value = {"athletes": [_RAW_PLAYER]}
+    players = await adapter.get_roster("15362")
+    assert len(players) == 1
+    p = players[0]
+    assert p.id == "219821"
+    assert p.full_name == "Mackenzie Arnold"
+    assert p.jersey == "18"
+    assert p.position == "Goalkeeper"
+    assert p.position_abbr == "G"
+    assert p.citizenship == "Australia"
+    assert p.age == 32
+
+
+async def test_get_roster_uses_team_specific_path(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value.json.return_value = {"athletes": []}
+    await adapter.get_roster("15362")
+    assert "/teams/15362/roster" in mock_client.get.call_args.args[0]
+
+
+async def test_get_roster_handles_missing_optional_fields(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    minimal_player = {"id": "1", "fullName": "Jane Doe"}
+    mock_client.get.return_value.json.return_value = {"athletes": [minimal_player]}
+    players = await adapter.get_roster("15362")
+    assert players[0].jersey is None
+    assert players[0].position is None
+    assert players[0].citizenship is None
+    assert players[0].age is None
+
+
+async def test_get_match_details_parses_summary(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value.json.return_value = _RAW_SUMMARY
+    details = await adapter.get_match_details("401853883")
+    assert details.id == "401853883"
+    assert details.date == "2026-04-04T22:30Z"
+    assert details.status_detail == "Full Time"
+    assert details.home_team == "North Carolina Courage"
+    assert details.away_team == "Portland Thorns FC"
+    assert details.home_score == "2"
+    assert details.away_score == "2"
+    assert details.venue == "WakeMed Soccer Park"
+    assert details.venue_city == "Cary, North Carolina"
+    assert details.attendance == 7018
+    assert len(details.key_events) == 2
+    goal = details.key_events[0]
+    assert goal.type == "goal---header"
+    assert goal.scoring is True
+    assert goal.clock == "12'"
+    assert goal.team_name == "Portland Thorns FC"
+
+
+async def test_get_match_details_passes_event_param(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value.json.return_value = _RAW_SUMMARY
+    await adapter.get_match_details("401853883")
+    call = mock_client.get.call_args
+    assert "/summary" in call.args[0]
+    assert call.kwargs.get("params", {}).get("event") == "401853883"
+
+
+async def test_get_match_details_raises_not_found_when_no_header(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value.json.return_value = {}
+    with pytest.raises(NWSLNotFoundError):
+        await adapter.get_match_details("9999999")
+
+
+async def test_get_team_schedule_returns_matches(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value.json.return_value = {"events": [_RAW_EVENT]}
+    matches = await adapter.get_team_schedule("1899")
+    assert len(matches) == 1
+    assert matches[0].id == "701123"
+
+
+async def test_get_team_schedule_uses_team_specific_path(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value.json.return_value = {"events": []}
+    await adapter.get_team_schedule("1899")
+    requested_path = mock_client.get.call_args.args[0]
+    assert "/teams/1899/schedule" in requested_path
+
+
 async def test_get_standings_returns_sorted_list(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
     mock_client.get.return_value.json.return_value = {"children": [{"standings": {"entries": [_RAW_STANDING_ENTRY]}}]}
     standings = await adapter.get_standings()
     assert len(standings) == 1
     assert standings[0].points == 38
+
+
+async def test_get_standings_uses_v2_path_without_site_segment(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    mock_client.get.return_value.json.return_value = {"children": []}
+    await adapter.get_standings()
+    requested_path = mock_client.get.call_args.args[0]
+    assert requested_path == "/apis/v2/sports/soccer/usa.nwsl/standings"
 
 
 async def test_get_teams_raises_upstream_error_on_500(
