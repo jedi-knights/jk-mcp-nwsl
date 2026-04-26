@@ -185,6 +185,47 @@ def test_parse_match_maps_fields() -> None:
     assert match.competitors[0].winner is True
 
 
+def test_parse_match_extracts_score_from_ref_dict() -> None:
+    """The team-schedule endpoint returns scores as $ref dicts; we must extract displayValue.
+
+    Reproduces a bug where get_team_schedule output contained the full score dict
+    (e.g. `{'$ref': '...', 'value': 2.0, 'displayValue': '2', ...}`) instead of
+    a clean string like '2'. Same Match model and formatter as get_scoreboard;
+    the difference is purely in how ESPN serializes the competitor score field.
+    """
+    event_with_ref_score = {
+        "id": "401853883",
+        "date": "2026-04-04T22:30Z",
+        "name": "POR at NC",
+        "shortName": "POR @ NC",
+        "competitions": [
+            {
+                "status": {
+                    "displayClock": "FT",
+                    "type": {"name": "post", "description": "Full Time"},
+                },
+                "competitors": [
+                    {
+                        "homeAway": "home",
+                        "score": {
+                            "$ref": "http://sports.core.api.espn.pvt/...",
+                            "value": 2.0,
+                            "displayValue": "2",
+                            "winner": False,
+                            "source": {"id": "38", "description": "SA.ENVOY"},
+                        },
+                        "winner": False,
+                        "team": _RAW_TEAM,
+                    },
+                ],
+            }
+        ],
+    }
+    match = _parse_match(event_with_ref_score)
+    assert match.competitors[0].score == "2"
+    assert match.competitors[0].winner is False
+
+
 def test_parse_standing_maps_stats() -> None:
     standing = _parse_standing(_RAW_STANDING_ENTRY)
     assert standing is not None
