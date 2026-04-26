@@ -96,22 +96,35 @@ No installation, no Python, no cloning required. Connect your MCP client directl
 
 ### Claude Code
 
+Install globally (recommended) so the server is available in every project:
+
 ```sh
-claude mcp add --transport http nwsl https://jk-mcp-nwsl.fly.dev/mcp
+claude mcp add --transport http --scope user nwsl https://jk-mcp-nwsl.fly.dev/mcp
 ```
 
-Or add it manually to your project's `.claude/settings.json`:
+Verify it's registered and healthy:
 
-```json
-{
-  "mcpServers": {
-    "nwsl": {
-      "type": "http",
-      "url": "https://jk-mcp-nwsl.fly.dev/mcp"
+```sh
+claude mcp list
+```
+
+You should see `nwsl: https://jk-mcp-nwsl.fly.dev/mcp (HTTP) - ✓ Connected`. Restart Claude Code if you had it open.
+
+**Other scopes:**
+
+- Drop `--scope user` to register only for the current project (`cwd` must match when you run `claude`).
+- Or commit a `.mcp.json` to the repo root to share with collaborators:
+
+  ```json
+  {
+    "mcpServers": {
+      "nwsl": {
+        "type": "http",
+        "url": "https://jk-mcp-nwsl.fly.dev/mcp"
+      }
     }
   }
-}
-```
+  ```
 
 ### Claude Desktop
 
@@ -181,26 +194,33 @@ All configuration is via environment variables. None are required for local use.
 
 ## Claude Code
 
-Add the server to Claude Code from the repository root:
+> Prefer the hosted server? See [Production → Claude Code](#claude-code) above — it's a single command and requires no clone.
+
+To run the server from your local clone instead, install it globally:
 
 ```sh
-claude mcp add nwsl -- uv run --directory /path/to/jk-mcp-nwsl python -m nwsl.server
+claude mcp add --scope user nwsl -- uv run --directory /path/to/jk-mcp-nwsl python -m nwsl.server
 ```
 
-Or add it manually to your project's `.claude/settings.json`:
+Replace `/path/to/jk-mcp-nwsl` with the absolute path to your clone. Verify with `claude mcp list`.
 
-```json
-{
-  "mcpServers": {
-    "nwsl": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/jk-mcp-nwsl", "python", "-m", "nwsl.server"]
+**Other scopes:**
+
+- Drop `--scope user` to register only for the current project.
+- Or commit a `.mcp.json` to the repo root for collaborators:
+
+  ```json
+  {
+    "mcpServers": {
+      "nwsl": {
+        "command": "uv",
+        "args": ["run", "--directory", "/path/to/jk-mcp-nwsl", "python", "-m", "nwsl.server"]
+      }
     }
   }
-}
-```
+  ```
 
-Replace `/path/to/jk-mcp-nwsl` with the absolute path to your clone. See [Example Prompts](#example-prompts) for ideas on what to ask.
+See [Example Prompts](#example-prompts) for ideas on what to ask.
 
 ---
 
