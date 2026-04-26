@@ -2,10 +2,10 @@
 
 This is the only place in the codebase that knows about:
 - The ESPN API host and URL structure
-- ESPN's JSON wire format (camelCase, nested objects)
-- How to map ESPN responses to domain models
+- How to issue HTTP requests and translate non-2xx responses into domain errors
 
-Everything else in the system talks to the NWSLAPIPort protocol.
+The wire-format → domain-model mapping lives in parsers.py so this module
+stays focused on transport.
 """
 
 import logging
@@ -14,12 +14,22 @@ from typing import Any
 import httpx
 
 from ...domain.exceptions import NWSLNotFoundError, UpstreamAPIError
-from ...domain.models import Match, MatchCompetitor, Standing, Team
+from ...domain.models import Match, MatchDetails, NewsArticle, Player, Standing, Team
+from .parsers import (
+    _parse_article,
+    _parse_match,
+    _parse_match_details,
+    _parse_player,
+    _parse_standing,
+    _parse_team,
+)
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_BASE_URL = "https://site.api.espn.com"
 _LEAGUE_PATH = "/apis/site/v2/sports/soccer/usa.nwsl"
+# Standings live on the /apis/v2 surface — the /apis/site/v2 path returns an empty {}.
+_STANDINGS_PATH = "/apis/v2/sports/soccer/usa.nwsl/standings"
 
 
 def _check_response(response: httpx.Response, path: str) -> None:
@@ -39,87 +49,6 @@ def _check_response(response: httpx.Response, path: str) -> None:
         if exc.response.status_code == 404:
             raise NWSLNotFoundError(f"Not found: {path}") from exc
         raise UpstreamAPIError(f"Upstream error {exc.response.status_code}: {path}") from exc
-
-
-def _parse_team(raw: dict[str, Any]) -> Team:
-    """Map a raw ESPN team object to a domain Team.
-
-    Args:
-        raw: The team dict from the ESPN API (may be nested under "team" key).
-    """
-    team = raw.get("team", raw)
-    logos = team.get("logos", [])
-    logo_url = logos[0].get("href") if logos else None
-    return Team(
-        id=str(team.get("id", "")),
-        name=team.get("name", ""),
-        abbreviation=team.get("abbreviation", ""),
-        location=team.get("location", ""),
-        display_name=team.get("displayName", ""),
-        logo_url=logo_url,
-    )
-
-
-def _parse_competitor(raw: dict[str, Any]) -> MatchCompetitor:
-    """Map a raw ESPN competitor object to a domain MatchCompetitor.
-
-    Args:
-        raw: A competitor dict from a scoreboard event.
-    """
-    score = raw.get("score")
-    winner = raw.get("winner")
-    return MatchCompetitor(
-        team=_parse_team(raw),
-        home_away=raw.get("homeAway", ""),
-        score=str(score) if score is not None else None,
-        winner=bool(winner) if winner is not None else None,
-    )
-
-
-def _parse_match(event: dict[str, Any]) -> Match:
-    """Map a raw ESPN scoreboard event to a domain Match.
-
-    Args:
-        event: An event dict from the ESPN scoreboard response.
-    """
-    competition = event.get("competitions", [{}])[0]
-    status = competition.get("status", {})
-    status_type = status.get("type", {})
-    competitors = [_parse_competitor(c) for c in competition.get("competitors", [])]
-    return Match(
-        id=str(event.get("id", "")),
-        date=event.get("date", ""),
-        name=event.get("name", ""),
-        short_name=event.get("shortName", ""),
-        status_type=status_type.get("name", ""),
-        status_detail=status.get("displayClock", status_type.get("description", "")),
-        competitors=competitors,
-    )
-
-
-def _parse_standing(entry: dict[str, Any]) -> Standing | None:
-    """Map a raw ESPN standings entry to a domain Standing.
-
-    Returns None for entries that lack the required team data.
-
-    Args:
-        entry: A standings entry dict from the ESPN standings response.
-    """
-    team_raw = entry.get("team")
-    if not team_raw:
-        return None
-
-    stats: dict[str, Any] = {s["name"]: s.get("value", 0) for s in entry.get("stats", [])}
-    return Standing(
-        team=_parse_team(team_raw),
-        wins=int(stats.get("wins", 0)),
-        losses=int(stats.get("losses", 0)),
-        ties=int(stats.get("ties", 0)),
-        points=int(stats.get("points", 0)),
-        goals_for=int(stats.get("pointsFor", 0)),
-        goals_against=int(stats.get("pointsAgainst", 0)),
-        goal_difference=int(stats.get("pointDifferential", 0)),
-    )
 
 
 class ESPNAdapter:
@@ -177,21 +106,70 @@ class ESPNAdapter:
             raise NWSLNotFoundError(f"Team not found: {team_id}")
         return _parse_team(raw)
 
-    async def get_scoreboard(self, date: str | None = None) -> list[Match]:
-        """Return matches on the given date (YYYYMMDD) or the current week if date is None.
+    async def get_scoreboard(self, date: str | None = None, end_date: str | None = None) -> list[Match]:
+        """Return matches on the given date or date range, or the current week if date is None.
 
         Args:
             date: Optional date string in YYYYMMDD format.
+            end_date: Optional end date in YYYYMMDD format. When set, `date` is the start
+                of the range and ESPN's `dates=START-END` parameter is used.
         """
         params: dict[str, Any] = {}
-        if date:
+        if date and end_date:
+            params["dates"] = f"{date}-{end_date}"
+        elif date:
             params["dates"] = date
         data = await self._get(f"{_LEAGUE_PATH}/scoreboard", params)
         return [_parse_match(e) for e in data.get("events", [])]
 
+    async def get_roster(self, team_id: str) -> list[Player]:
+        """Return the active roster for a team.
+
+        Args:
+            team_id: ESPN numeric team ID.
+
+        Raises:
+            NWSLNotFoundError: If no team with that ID exists.
+        """
+        data = await self._get(f"{_LEAGUE_PATH}/teams/{team_id}/roster")
+        return [_parse_player(p) for p in data.get("athletes", [])]
+
+    async def get_match_details(self, match_id: str) -> MatchDetails:
+        """Return detailed information for a single match.
+
+        Args:
+            match_id: ESPN numeric event ID.
+
+        Raises:
+            NWSLNotFoundError: If no match with that ID exists.
+        """
+        data = await self._get(f"{_LEAGUE_PATH}/summary", {"event": match_id})
+        return _parse_match_details(data)
+
+    async def get_team_schedule(self, team_id: str) -> list[Match]:
+        """Return all scheduled and completed matches for a team in the current season.
+
+        Args:
+            team_id: ESPN numeric team ID.
+
+        Raises:
+            NWSLNotFoundError: If no team with that ID exists.
+        """
+        data = await self._get(f"{_LEAGUE_PATH}/teams/{team_id}/schedule")
+        return [_parse_match(e) for e in data.get("events", [])]
+
+    async def get_news(self, limit: int) -> list[NewsArticle]:
+        """Return recent NWSL news articles.
+
+        Args:
+            limit: Maximum number of articles to return.
+        """
+        data = await self._get(f"{_LEAGUE_PATH}/news", {"limit": limit})
+        return [_parse_article(a) for a in data.get("articles", [])]
+
     async def get_standings(self) -> list[Standing]:
         """Return the current NWSL league standings ordered by points descending."""
-        data = await self._get(f"{_LEAGUE_PATH}/standings")
+        data = await self._get(_STANDINGS_PATH)
         entries: list[dict[str, Any]] = []
         for season in data.get("children", []):
             for division in season.get("standings", {}).get("entries", []):

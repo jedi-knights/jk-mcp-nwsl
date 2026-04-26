@@ -61,6 +61,62 @@ async def test_cache_miss_after_ttl_expiry(
     assert mock_inner.get_teams.call_count == 2
 
 
+async def test_get_news_is_cached(
+    mock_inner: AsyncMock,
+    sample_article,
+    clock: list[float],
+) -> None:
+    adapter = CachingAdapter(mock_inner, ttl_seconds=60.0, now=make_clock(clock))
+    mock_inner.get_news.return_value = [sample_article]
+
+    await adapter.get_news(5)
+    await adapter.get_news(5)
+
+    mock_inner.get_news.assert_called_once_with(limit=5)
+
+
+async def test_get_roster_is_cached(
+    mock_inner: AsyncMock,
+    sample_player,
+    clock: list[float],
+) -> None:
+    adapter = CachingAdapter(mock_inner, ttl_seconds=60.0, now=make_clock(clock))
+    mock_inner.get_roster.return_value = [sample_player]
+
+    await adapter.get_roster("15362")
+    await adapter.get_roster("15362")
+
+    mock_inner.get_roster.assert_called_once_with(team_id="15362")
+
+
+async def test_get_match_details_is_cached(
+    mock_inner: AsyncMock,
+    sample_match_details,
+    clock: list[float],
+) -> None:
+    adapter = CachingAdapter(mock_inner, ttl_seconds=60.0, now=make_clock(clock))
+    mock_inner.get_match_details.return_value = sample_match_details
+
+    await adapter.get_match_details("401853883")
+    await adapter.get_match_details("401853883")
+
+    mock_inner.get_match_details.assert_called_once_with(match_id="401853883")
+
+
+async def test_get_team_schedule_is_cached(
+    mock_inner: AsyncMock,
+    sample_match,
+    clock: list[float],
+) -> None:
+    adapter = CachingAdapter(mock_inner, ttl_seconds=60.0, now=make_clock(clock))
+    mock_inner.get_team_schedule.return_value = [sample_match]
+
+    await adapter.get_team_schedule("1899")
+    await adapter.get_team_schedule("1899")
+
+    mock_inner.get_team_schedule.assert_called_once_with(team_id="1899")
+
+
 async def test_scoreboard_uses_shorter_ttl(
     mock_inner: AsyncMock,
     sample_match,

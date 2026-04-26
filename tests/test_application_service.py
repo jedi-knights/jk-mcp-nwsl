@@ -9,7 +9,20 @@ from unittest.mock import AsyncMock
 import pytest
 
 from nwsl.application.service import NWSLService
-from nwsl.domain.models import Match, Standing, Team
+from nwsl.domain.exceptions import NWSLNotFoundError
+from nwsl.domain.models import (
+    CMSArticle,
+    Match,
+    MatchDetails,
+    NewsArticle,
+    Player,
+    PlayerSeasonStat,
+    Season,
+    SeasonStanding,
+    Standing,
+    Team,
+    TeamSeasonStat,
+)
 
 
 async def test_get_teams_delegates_to_repo(
@@ -62,8 +75,39 @@ async def test_get_scoreboard_delegates_to_repo(
 ) -> None:
     mock_repo.get_scoreboard.return_value = [sample_match]
     result = await nwsl_service.get_scoreboard("20250601")
-    mock_repo.get_scoreboard.assert_called_once_with("20250601")
+    mock_repo.get_scoreboard.assert_called_once_with("20250601", None)
     assert result == [sample_match]
+
+
+async def test_get_scoreboard_with_date_range(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+    sample_match: Match,
+) -> None:
+    mock_repo.get_scoreboard.return_value = [sample_match]
+    result = await nwsl_service.get_scoreboard("20260404", end_date="20260405")
+    mock_repo.get_scoreboard.assert_called_once_with("20260404", "20260405")
+    assert result == [sample_match]
+
+
+async def test_get_scoreboard_rejects_end_date_without_start(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+) -> None:
+    with pytest.raises(ValueError, match="end_date requires"):
+        await nwsl_service.get_scoreboard(None, end_date="20260405")
+    mock_repo.get_scoreboard.assert_not_called()
+
+
+@pytest.mark.parametrize("bad_end", ["2026-04-05", "2026040", "ABCDEFGH"])
+async def test_get_scoreboard_rejects_invalid_end_date(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+    bad_end: str,
+) -> None:
+    with pytest.raises(ValueError, match="YYYYMMDD"):
+        await nwsl_service.get_scoreboard("20260404", end_date=bad_end)
+    mock_repo.get_scoreboard.assert_not_called()
 
 
 async def test_get_scoreboard_accepts_none_date(
@@ -72,7 +116,7 @@ async def test_get_scoreboard_accepts_none_date(
 ) -> None:
     mock_repo.get_scoreboard.return_value = []
     await nwsl_service.get_scoreboard(None)
-    mock_repo.get_scoreboard.assert_called_once_with(None)
+    mock_repo.get_scoreboard.assert_called_once_with(None, None)
 
 
 @pytest.mark.parametrize("bad_date", ["2025-06-01", "20250", "ABCDEFGH", "2025060"])
@@ -84,6 +128,380 @@ async def test_get_scoreboard_rejects_invalid_date(
     with pytest.raises(ValueError, match="YYYYMMDD"):
         await nwsl_service.get_scoreboard(bad_date)
     mock_repo.get_scoreboard.assert_not_called()
+
+
+async def test_get_news_delegates_to_repo(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+    sample_article: NewsArticle,
+) -> None:
+    mock_repo.get_news.return_value = [sample_article]
+    result = await nwsl_service.get_news(5)
+    mock_repo.get_news.assert_called_once_with(5)
+    assert result == [sample_article]
+
+
+async def test_get_news_defaults_to_ten(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+) -> None:
+    mock_repo.get_news.return_value = []
+    await nwsl_service.get_news()
+    mock_repo.get_news.assert_called_once_with(10)
+
+
+@pytest.mark.parametrize("bad_limit", [0, -1, -100])
+async def test_get_news_rejects_non_positive_limit(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+    bad_limit: int,
+) -> None:
+    with pytest.raises(ValueError, match="positive"):
+        await nwsl_service.get_news(bad_limit)
+    mock_repo.get_news.assert_not_called()
+
+
+async def test_get_roster_delegates_to_repo(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+    sample_player: Player,
+) -> None:
+    mock_repo.get_roster.return_value = [sample_player]
+    result = await nwsl_service.get_roster("15362")
+    mock_repo.get_roster.assert_called_once_with("15362")
+    assert result == [sample_player]
+
+
+async def test_get_roster_strips_whitespace(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+) -> None:
+    mock_repo.get_roster.return_value = []
+    await nwsl_service.get_roster("  15362  ")
+    mock_repo.get_roster.assert_called_once_with("15362")
+
+
+@pytest.mark.parametrize("bad_id", ["", "   "])
+async def test_get_roster_rejects_empty_id(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+    bad_id: str,
+) -> None:
+    with pytest.raises(ValueError, match="must not be empty"):
+        await nwsl_service.get_roster(bad_id)
+    mock_repo.get_roster.assert_not_called()
+
+
+async def test_get_match_details_delegates_to_repo(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+    sample_match_details: MatchDetails,
+) -> None:
+    mock_repo.get_match_details.return_value = sample_match_details
+    result = await nwsl_service.get_match_details("401853883")
+    mock_repo.get_match_details.assert_called_once_with("401853883")
+    assert result == sample_match_details
+
+
+async def test_get_match_details_strips_whitespace(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+    sample_match_details: MatchDetails,
+) -> None:
+    mock_repo.get_match_details.return_value = sample_match_details
+    await nwsl_service.get_match_details("  401853883  ")
+    mock_repo.get_match_details.assert_called_once_with("401853883")
+
+
+@pytest.mark.parametrize("bad_id", ["", "   "])
+async def test_get_match_details_rejects_empty_id(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+    bad_id: str,
+) -> None:
+    with pytest.raises(ValueError, match="must not be empty"):
+        await nwsl_service.get_match_details(bad_id)
+    mock_repo.get_match_details.assert_not_called()
+
+
+async def test_get_team_schedule_delegates_to_repo(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+    sample_match: Match,
+) -> None:
+    mock_repo.get_team_schedule.return_value = [sample_match]
+    result = await nwsl_service.get_team_schedule("1899")
+    mock_repo.get_team_schedule.assert_called_once_with("1899")
+    assert result == [sample_match]
+
+
+async def test_get_team_schedule_strips_whitespace(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+) -> None:
+    mock_repo.get_team_schedule.return_value = []
+    await nwsl_service.get_team_schedule("  1899  ")
+    mock_repo.get_team_schedule.assert_called_once_with("1899")
+
+
+@pytest.mark.parametrize("bad_id", ["", "   "])
+async def test_get_team_schedule_rejects_empty_id(
+    nwsl_service: NWSLService,
+    mock_repo: AsyncMock,
+    bad_id: str,
+) -> None:
+    with pytest.raises(ValueError, match="must not be empty"):
+        await nwsl_service.get_team_schedule(bad_id)
+    mock_repo.get_team_schedule.assert_not_called()
+
+
+async def test_get_player_leaderboards_resolves_year_and_calls_sdp(
+    nwsl_service: NWSLService,
+    mock_sdp: AsyncMock,
+    mock_discovery: AsyncMock,
+    sample_season: Season,
+    sample_player_season_stat: PlayerSeasonStat,
+) -> None:
+    mock_discovery.get_seasons.return_value = [sample_season]
+    mock_sdp.get_player_stats.return_value = [sample_player_season_stat]
+
+    result = await nwsl_service.get_player_leaderboards(season_year=2026, sort_by="goals", limit=10)
+
+    mock_sdp.get_player_stats.assert_called_once_with(sample_season.id, "goals", 10)
+    assert result == [sample_player_season_stat]
+
+
+async def test_get_player_leaderboards_defaults_to_most_recent_year(
+    nwsl_service: NWSLService,
+    mock_sdp: AsyncMock,
+    mock_discovery: AsyncMock,
+) -> None:
+    older = Season(id="old-id", year=2024, name="Regular Season 2024", competition="Regular Season")
+    newer = Season(id="new-id", year=2026, name="Regular Season 2026", competition="Regular Season")
+    mock_discovery.get_seasons.return_value = [older, newer]
+    mock_sdp.get_player_stats.return_value = []
+
+    await nwsl_service.get_player_leaderboards()
+
+    mock_sdp.get_player_stats.assert_called_once_with("new-id", "goals", 20)
+
+
+async def test_get_player_leaderboards_raises_when_year_missing(
+    nwsl_service: NWSLService,
+    mock_discovery: AsyncMock,
+    sample_season: Season,
+) -> None:
+    mock_discovery.get_seasons.return_value = [sample_season]
+    with pytest.raises(NWSLNotFoundError, match="2099"):
+        await nwsl_service.get_player_leaderboards(season_year=2099)
+
+
+@pytest.mark.parametrize("bad_limit", [0, -1])
+async def test_get_player_leaderboards_rejects_non_positive_limit(
+    nwsl_service: NWSLService,
+    mock_discovery: AsyncMock,
+    bad_limit: int,
+) -> None:
+    with pytest.raises(ValueError, match="positive"):
+        await nwsl_service.get_player_leaderboards(limit=bad_limit)
+    mock_discovery.get_seasons.assert_not_called()
+
+
+async def test_get_draft_articles_filters_by_keyword(
+    nwsl_service: NWSLService,
+    mock_cms: AsyncMock,
+) -> None:
+    draft = CMSArticle(
+        slug="2025-draft",
+        title="2025 NWSL Draft: Round 1 picks",
+        summary="",
+        published="",
+        link="",
+    )
+    other = CMSArticle(slug="x", title="Other story", summary="", published="", link="")
+    mock_cms.get_recent_stories.return_value = [draft, other]
+    result = await nwsl_service.get_draft_articles()
+    assert result == [draft]
+
+
+async def test_get_draft_articles_filters_by_year(
+    nwsl_service: NWSLService,
+    mock_cms: AsyncMock,
+) -> None:
+    d2024 = CMSArticle(slug="a", title="2024 NWSL Draft results", summary="", published="", link="")
+    d2025 = CMSArticle(slug="b", title="2025 NWSL Draft results", summary="", published="", link="")
+    mock_cms.get_recent_stories.return_value = [d2024, d2025]
+    result = await nwsl_service.get_draft_articles(year=2025)
+    assert result == [d2025]
+
+
+async def test_get_draft_articles_year_filter_uses_word_boundaries(
+    nwsl_service: NWSLService,
+    mock_cms: AsyncMock,
+) -> None:
+    """A title containing '20250' or 'pre-2025' should not match year=2025
+    via naive substring matching."""
+    longer_number = CMSArticle(slug="a", title="NWSL Draft attendance hits 20250", summary="", published="", link="")
+    target = CMSArticle(slug="b", title="NWSL 2025 Draft picks announced", summary="", published="", link="")
+    mock_cms.get_recent_stories.return_value = [longer_number, target]
+    result = await nwsl_service.get_draft_articles(year=2025)
+    assert result == [target]
+
+
+@pytest.mark.parametrize("bad_limit", [0, -1])
+async def test_get_draft_articles_rejects_non_positive_limit(
+    nwsl_service: NWSLService,
+    mock_cms: AsyncMock,
+    bad_limit: int,
+) -> None:
+    with pytest.raises(ValueError, match="positive"):
+        await nwsl_service.get_draft_articles(limit=bad_limit)
+    mock_cms.get_recent_stories.assert_not_called()
+
+
+async def test_get_award_articles_filters_by_title_keywords(
+    nwsl_service: NWSLService,
+    mock_cms: AsyncMock,
+    sample_award_article: CMSArticle,
+    sample_news_article: CMSArticle,
+) -> None:
+    mock_cms.get_recent_stories.return_value = [sample_news_article, sample_award_article]
+    result = await nwsl_service.get_award_articles(limit=5)
+    assert result == [sample_award_article]
+
+
+async def test_get_award_articles_caps_at_limit(
+    nwsl_service: NWSLService,
+    mock_cms: AsyncMock,
+    sample_award_article: CMSArticle,
+) -> None:
+    mock_cms.get_recent_stories.return_value = [sample_award_article] * 20
+    result = await nwsl_service.get_award_articles(limit=3)
+    assert len(result) == 3
+
+
+async def test_get_award_articles_matches_player_of_the_month(
+    nwsl_service: NWSLService,
+    mock_cms: AsyncMock,
+) -> None:
+    article = CMSArticle(
+        slug="potm",
+        title="Sveindis Jonsdottir Named NWSL Player of the Month",
+        summary="",
+        published="",
+        link="",
+    )
+    mock_cms.get_recent_stories.return_value = [article]
+    result = await nwsl_service.get_award_articles()
+    assert result == [article]
+
+
+@pytest.mark.parametrize("bad_limit", [0, -1])
+async def test_get_award_articles_rejects_non_positive_limit(
+    nwsl_service: NWSLService,
+    mock_cms: AsyncMock,
+    bad_limit: int,
+) -> None:
+    with pytest.raises(ValueError, match="positive"):
+        await nwsl_service.get_award_articles(limit=bad_limit)
+    mock_cms.get_recent_stories.assert_not_called()
+
+
+async def test_get_challenge_cup_standings_resolves_competition(
+    nwsl_service: NWSLService,
+    mock_sdp: AsyncMock,
+    mock_discovery: AsyncMock,
+) -> None:
+    rs = Season(id="rs-2026", year=2026, name="Regular Season 2026", competition="Regular Season")
+    cc = Season(id="cc-2026", year=2026, name="Challenge Cup 2026", competition="Challenge Cup")
+    mock_discovery.get_seasons.return_value = [rs, cc]
+    mock_sdp.get_standings_for_season.return_value = []
+
+    await nwsl_service.get_challenge_cup_standings(season_year=2026)
+
+    # Must use the Challenge Cup ID, not the Regular Season ID.
+    mock_sdp.get_standings_for_season.assert_called_once_with("cc-2026")
+
+
+async def test_get_challenge_cup_standings_defaults_to_most_recent(
+    nwsl_service: NWSLService,
+    mock_sdp: AsyncMock,
+    mock_discovery: AsyncMock,
+) -> None:
+    cc_2024 = Season(id="cc-2024", year=2024, name="Challenge Cup 2024", competition="Challenge Cup")
+    cc_2026 = Season(id="cc-2026", year=2026, name="Challenge Cup 2026", competition="Challenge Cup")
+    mock_discovery.get_seasons.return_value = [cc_2024, cc_2026]
+    mock_sdp.get_standings_for_season.return_value = []
+
+    await nwsl_service.get_challenge_cup_standings()
+
+    mock_sdp.get_standings_for_season.assert_called_once_with("cc-2026")
+
+
+async def test_get_historical_standings_resolves_year_and_calls_sdp(
+    nwsl_service: NWSLService,
+    mock_sdp: AsyncMock,
+    mock_discovery: AsyncMock,
+) -> None:
+    season_2018 = Season(id="s-2018", year=2018, name="Regular Season 2018", competition="Regular Season")
+    standing = SeasonStanding(
+        rank=1,
+        team_id="t1",
+        team_name="North Carolina Courage",
+        points=57,
+        matches_played=24,
+        wins=17,
+        draws=6,
+        losses=1,
+        goals_for=53,
+        goals_against=18,
+        goal_difference=35,
+        team_abbreviation="NCC",
+    )
+    mock_discovery.get_seasons.return_value = [season_2018]
+    mock_sdp.get_standings_for_season.return_value = [standing]
+
+    result = await nwsl_service.get_historical_standings(season_year=2018)
+
+    mock_sdp.get_standings_for_season.assert_called_once_with("s-2018")
+    assert result == [standing]
+
+
+async def test_get_historical_standings_raises_when_year_missing(
+    nwsl_service: NWSLService,
+    mock_discovery: AsyncMock,
+    sample_season: Season,
+) -> None:
+    mock_discovery.get_seasons.return_value = [sample_season]
+    with pytest.raises(NWSLNotFoundError, match="2050"):
+        await nwsl_service.get_historical_standings(season_year=2050)
+
+
+async def test_get_team_season_stats_resolves_year_and_calls_sdp(
+    nwsl_service: NWSLService,
+    mock_sdp: AsyncMock,
+    mock_discovery: AsyncMock,
+    sample_season: Season,
+) -> None:
+    team_stat = TeamSeasonStat(team_id="t1", name="Angel City", stats={"total-points": 9.0})
+    mock_discovery.get_seasons.return_value = [sample_season]
+    mock_sdp.get_team_stats.return_value = [team_stat]
+
+    result = await nwsl_service.get_team_season_stats(season_year=2026, sort_by="goals", limit=16)
+
+    mock_sdp.get_team_stats.assert_called_once_with(sample_season.id, "goals", 16)
+    assert result == [team_stat]
+
+
+@pytest.mark.parametrize("bad_limit", [0, -5])
+async def test_get_team_season_stats_rejects_non_positive_limit(
+    nwsl_service: NWSLService,
+    mock_discovery: AsyncMock,
+    bad_limit: int,
+) -> None:
+    with pytest.raises(ValueError, match="positive"):
+        await nwsl_service.get_team_season_stats(limit=bad_limit)
+    mock_discovery.get_seasons.assert_not_called()
 
 
 async def test_get_standings_delegates_to_repo(

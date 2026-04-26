@@ -13,7 +13,7 @@ import logging
 from collections.abc import Callable
 
 from ...domain.exceptions import NWSLNotFoundError, UpstreamAPIError
-from ...domain.models import Match, Standing, Team
+from ...domain.models import Match, MatchDetails, NewsArticle, Player, Standing, Team
 from ...ports.outbound import NWSLAPIPort
 
 logger = logging.getLogger(__name__)
@@ -87,8 +87,20 @@ class RetryingAdapter:
     async def get_team(self, team_id: str) -> Team:
         return await self._retry("get_team", team_id=team_id)  # type: ignore[return-value]
 
-    async def get_scoreboard(self, date: str | None = None) -> list[Match]:
-        return await self._retry("get_scoreboard", date=date)  # type: ignore[return-value]
+    async def get_scoreboard(self, date: str | None = None, end_date: str | None = None) -> list[Match]:
+        return await self._retry("get_scoreboard", date=date, end_date=end_date)  # type: ignore[return-value]
+
+    async def get_team_schedule(self, team_id: str) -> list[Match]:
+        return await self._retry("get_team_schedule", team_id=team_id)  # type: ignore[return-value]
+
+    async def get_match_details(self, match_id: str) -> MatchDetails:
+        return await self._retry("get_match_details", match_id=match_id)  # type: ignore[return-value]
+
+    async def get_roster(self, team_id: str) -> list[Player]:
+        return await self._retry("get_roster", team_id=team_id)  # type: ignore[return-value]
+
+    async def get_news(self, limit: int) -> list[NewsArticle]:
+        return await self._retry("get_news", limit=limit)  # type: ignore[return-value]
 
     async def get_standings(self) -> list[Standing]:
         return await self._retry("get_standings")  # type: ignore[return-value]
