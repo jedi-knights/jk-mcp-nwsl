@@ -1,6 +1,7 @@
 """Internal helpers for NWSLService — validation, season selection, keyword filtering.
 
 Extracted from service.py to keep that file focused on use-case orchestration.
+Schedule-strength analytics helpers live in `_analytics_helpers.py`.
 """
 
 from ..domain.exceptions import NWSLNotFoundError

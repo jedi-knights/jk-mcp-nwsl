@@ -216,3 +216,77 @@ class Standing:
     goals_for: int
     goals_against: int
     goal_difference: int
+
+
+@dataclass
+class OpponentPPG:
+    """One opponent a team has played, paired with that opponent's current PPG.
+
+    `points_per_game` is computed from the opponent's full league record (no
+    self-exclusion), so it reflects current standings position rather than a
+    strict RPI-style adjustment.
+    """
+
+    team: Team
+    matches_played: int
+    points: int
+    points_per_game: float
+
+
+@dataclass
+class StrengthOfSchedule:
+    """Opponent-quality summary for a single team.
+
+    Aggregates the current points-per-game of every opponent the team has
+    actually faced (completed matches only). Useful for "who has played the
+    tougher schedule so far?" questions early in the season.
+    """
+
+    team: Team
+    matches_played: int
+    opponents: list[OpponentPPG]
+    average_opponent_ppg: float
+
+
+@dataclass
+class TierRecord:
+    """A team's W-L-T record against opponents in one current-standings tier."""
+
+    label: str
+    rank_low: int
+    rank_high: int
+    wins: int
+    losses: int
+    ties: int
+
+
+@dataclass
+class ResultsByOpponentTier:
+    """A team's results split by the current-standings tier of each opponent.
+
+    Tiers are derived from the live league table at call time, not the table
+    at the time each match was played — interpret as "how have you done
+    against teams that are currently strong/middle/weak?"
+    """
+
+    team: Team
+    tier_size: int
+    tiers: list[TierRecord]
+
+
+@dataclass
+class AdjustedPointsPerGame:
+    """Raw vs. opponent-quality-adjusted PPG for a single team.
+
+    `adjusted_ppg` scales raw PPG by `average_opponent_ppg / league_average_ppg`,
+    so values above raw PPG mean the team has earned points against a tougher
+    schedule than league average.
+    """
+
+    team: Team
+    matches_played: int
+    points: int
+    raw_ppg: float
+    average_opponent_ppg: float
+    league_average_ppg: float
+    adjusted_ppg: float

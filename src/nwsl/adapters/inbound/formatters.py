@@ -5,18 +5,23 @@ presentation layer stays a side-effect-free, easily testable concern.
 """
 
 from ...domain.models import (
+    AdjustedPointsPerGame,
     CMSArticle,
     Match,
     MatchCompetitor,
     MatchDetails,
     MatchEvent,
     NewsArticle,
+    OpponentPPG,
     Player,
     PlayerSeasonStat,
+    ResultsByOpponentTier,
     SeasonStanding,
     Standing,
+    StrengthOfSchedule,
     Team,
     TeamSeasonStat,
+    TierRecord,
 )
 
 
@@ -261,3 +266,60 @@ def _fmt_standings(standings: list[Standing]) -> str:
     if not standings:
         return "No standings data available."
     return "\n".join(_fmt_standing(i, s) for i, s in enumerate(standings, 1))
+
+
+def _fmt_opponent_row(opp: OpponentPPG, meetings: int) -> str:
+    """Format one opponent row, marking repeat fixtures as 'x2', 'x3', etc."""
+    suffix = f" x{meetings}" if meetings > 1 else ""
+    return f"    - {opp.team.display_name}{suffix}: {opp.points_per_game:.2f} ({opp.points} pts in {opp.matches_played} GP)"
+
+
+def _fmt_strength_of_schedule(sos: StrengthOfSchedule) -> str:
+    """Format a StrengthOfSchedule as a labeled summary plus opponent breakdown.
+
+    Repeat fixtures (an opponent met twice via home + away) collapse into a
+    single row marked `x2` — the average PPG calculation already weights them
+    correctly, so the output stays tidy without losing information.
+    """
+    if sos.matches_played == 0:
+        return f"{sos.team.display_name}: no matches played yet — strength of schedule unavailable."
+    counts: dict[str, int] = {}
+    unique: list[OpponentPPG] = []
+    for opp in sos.opponents:
+        if opp.team.id in counts:
+            counts[opp.team.id] += 1
+        else:
+            counts[opp.team.id] = 1
+            unique.append(opp)
+    lines = [
+        f"{sos.team.display_name} — Strength of Schedule",
+        f"  Matches played: {sos.matches_played}",
+        f"  Average opponent PPG: {sos.average_opponent_ppg:.2f}",
+        "  Opponents faced (current PPG):",
+    ]
+    lines.extend(_fmt_opponent_row(opp, counts[opp.team.id]) for opp in unique)
+    return "\n".join(lines)
+
+
+def _fmt_tier_record(t: TierRecord) -> str:
+    """Format a single TierRecord row as 'Label (ranks N-M): W-L-T'."""
+    return f"  {t.label} (ranks {t.rank_low}-{t.rank_high}): {t.wins}-{t.losses}-{t.ties}"
+
+
+def _fmt_results_by_tier(rbt: ResultsByOpponentTier) -> str:
+    """Format a ResultsByOpponentTier as a labeled W-L-T breakdown by tier."""
+    lines = [f"{rbt.team.display_name} — Results by Opponent Tier (tier size: {rbt.tier_size})"]
+    lines.extend(_fmt_tier_record(t) for t in rbt.tiers)
+    return "\n".join(lines)
+
+
+def _fmt_adjusted_ppg(a: AdjustedPointsPerGame) -> str:
+    """Format an AdjustedPointsPerGame as a labeled summary."""
+    return (
+        f"{a.team.display_name} — Adjusted Points Per Game\n"
+        f"  Record: {a.points} pts in {a.matches_played} GP\n"
+        f"  Raw PPG: {a.raw_ppg:.2f}\n"
+        f"  Average opponent PPG: {a.average_opponent_ppg:.2f}\n"
+        f"  League average PPG: {a.league_average_ppg:.2f}\n"
+        f"  Adjusted PPG: {a.adjusted_ppg:.2f}"
+    )

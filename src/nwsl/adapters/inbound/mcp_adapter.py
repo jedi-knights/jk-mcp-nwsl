@@ -20,6 +20,7 @@ from starlette.responses import JSONResponse
 
 from ...application.service import NWSLService
 from .tools._base import _safe_call as _safe_call_internal
+from .tools.analytics import register_analytics_tools
 from .tools.cms import register_cms_tools
 from .tools.espn import register_espn_tools
 from .tools.sdp import register_sdp_tools
@@ -73,5 +74,6 @@ def create_mcp_server(service: NWSLService, host: str = "0.0.0.0", port: int = 8
     register_espn_tools(mcp, service)
     register_sdp_tools(mcp, service)
     register_cms_tools(mcp, service)
+    register_analytics_tools(mcp, service)
 
     return mcp
