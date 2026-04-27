@@ -8,6 +8,7 @@ The wire-format → domain-model mapping lives in parsers.py so this module
 stays focused on transport.
 """
 
+import asyncio
 import logging
 from typing import Any
 
@@ -147,7 +148,12 @@ class ESPNAdapter:
         return _parse_match_details(data)
 
     async def get_team_schedule(self, team_id: str) -> list[Match]:
-        """Return all scheduled and completed matches for a team in the current season.
+        """Return all scheduled, in-progress, and completed matches for a team.
+
+        ESPN's team-schedule endpoint returns only past events by default and only
+        upcoming events when called with ``fixture=true``. Both variants are fetched
+        in parallel and merged, deduped by event id, and sorted chronologically so
+        callers see the full season in calendar order.
 
         Args:
             team_id: ESPN numeric team ID.
@@ -155,8 +161,17 @@ class ESPNAdapter:
         Raises:
             NWSLNotFoundError: If no team with that ID exists.
         """
-        data = await self._get(f"{_LEAGUE_PATH}/teams/{team_id}/schedule")
-        return [_parse_match(e) for e in data.get("events", [])]
+        path = f"{_LEAGUE_PATH}/teams/{team_id}/schedule"
+        past, future = await asyncio.gather(
+            self._get(path),
+            self._get(path, {"fixture": "true"}),
+        )
+        events_by_id: dict[str, dict[str, Any]] = {}
+        for event in (*past.get("events", []), *future.get("events", [])):
+            event_id = str(event.get("id", ""))
+            events_by_id.setdefault(event_id, event)
+        ordered = sorted(events_by_id.values(), key=lambda e: e.get("date", ""))
+        return [_parse_match(e) for e in ordered]
 
     async def get_news(self, limit: int) -> list[NewsArticle]:
         """Return recent NWSL news articles.

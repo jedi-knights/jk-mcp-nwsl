@@ -4,6 +4,7 @@ Uses a mock httpx.AsyncClient to avoid real network calls, keeping tests
 fast and deterministic.
 """
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -420,6 +421,80 @@ async def test_get_team_schedule_uses_team_specific_path(adapter: ESPNAdapter, m
     await adapter.get_team_schedule("1899")
     requested_path = mock_client.get.call_args.args[0]
     assert "/teams/1899/schedule" in requested_path
+
+
+def _schedule_response(events: list[dict[str, Any]]) -> MagicMock:
+    response = MagicMock()
+    response.status_code = 200
+    response.raise_for_status = MagicMock()
+    response.json.return_value = {"events": events}
+    return response
+
+
+async def test_get_team_schedule_merges_past_results_and_future_fixtures(
+    adapter: ESPNAdapter, mock_client: AsyncMock
+) -> None:
+    """ESPN's /teams/{id}/schedule returns only past events by default; passing
+    `fixture=true` returns only upcoming. The adapter must call both and merge
+    so users see the full season schedule."""
+    past = {**_RAW_EVENT, "id": "PAST", "date": "2026-03-14T16:00Z"}
+    future = {**_RAW_EVENT, "id": "FUTURE", "date": "2026-05-03T19:00Z"}
+
+    async def fake_get(_path: str, params: dict[str, Any] | None = None) -> MagicMock:
+        if params and params.get("fixture"):
+            return _schedule_response([future])
+        return _schedule_response([past])
+
+    mock_client.get = AsyncMock(side_effect=fake_get)
+
+    matches = await adapter.get_team_schedule("131562")
+
+    assert {m.id for m in matches} == {"PAST", "FUTURE"}
+
+
+async def test_get_team_schedule_requests_fixture_variant(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    """Adapter must make a second call with `fixture=true` to retrieve upcoming events."""
+    mock_client.get.return_value.json.return_value = {"events": []}
+    await adapter.get_team_schedule("131562")
+    fixture_calls = [c for c in mock_client.get.call_args_list if (c.kwargs.get("params") or {}).get("fixture")]
+    assert len(fixture_calls) == 1
+
+
+async def test_get_team_schedule_returns_chronological_order(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
+    """Merged schedule should be sorted ascending by date so callers see the season
+    in calendar order rather than the past-descending / future-ascending split ESPN returns."""
+    past_old = {**_RAW_EVENT, "id": "P1", "date": "2026-03-14T16:00Z"}
+    past_new = {**_RAW_EVENT, "id": "P2", "date": "2026-04-25T22:30Z"}
+    future_first = {**_RAW_EVENT, "id": "F1", "date": "2026-05-03T19:00Z"}
+    future_later = {**_RAW_EVENT, "id": "F2", "date": "2026-05-09T22:30Z"}
+
+    async def fake_get(_path: str, params: dict[str, Any] | None = None) -> MagicMock:
+        if params and params.get("fixture"):
+            return _schedule_response([future_first, future_later])
+        return _schedule_response([past_new, past_old])
+
+    mock_client.get = AsyncMock(side_effect=fake_get)
+
+    matches = await adapter.get_team_schedule("131562")
+
+    assert [m.id for m in matches] == ["P1", "P2", "F1", "F2"]
+
+
+async def test_get_team_schedule_dedupes_events_present_in_both_responses(
+    adapter: ESPNAdapter, mock_client: AsyncMock
+) -> None:
+    """If ESPN returns the same event from both default and fixture variants, the
+    merged result must contain it only once."""
+    shared = {**_RAW_EVENT, "id": "SHARED", "date": "2026-04-25T22:30Z"}
+
+    async def fake_get(_path: str, params: dict[str, Any] | None = None) -> MagicMock:
+        return _schedule_response([shared])
+
+    mock_client.get = AsyncMock(side_effect=fake_get)
+
+    matches = await adapter.get_team_schedule("131562")
+
+    assert [m.id for m in matches] == ["SHARED"]
 
 
 async def test_get_standings_returns_sorted_list(adapter: ESPNAdapter, mock_client: AsyncMock) -> None:
