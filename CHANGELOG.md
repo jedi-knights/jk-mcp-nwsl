@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3 (2026-04-27)
+
+### Bug Fixes
+
+- **espn-adapter:** include upcoming fixtures in team schedule (#17) (f852174)
+
 ## 0.3.2 (2026-04-26)
 
 ### Bug Fixes
