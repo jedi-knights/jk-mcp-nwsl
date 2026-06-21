@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 (2026-06-21)
+
+### Features
+
+- **server:** serve MCP at /mcp/nwsl (env MCP_PATH) (#20) (a41a3e3)
+
 ## 0.3.4 (2026-06-21)
 
 ### Bug Fixes
