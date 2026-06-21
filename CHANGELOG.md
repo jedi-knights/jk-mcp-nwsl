@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.4 (2026-06-21)
+
+### Bug Fixes
+
+- **fly:** make app private behind the api-gateway (#18) (a004da7)
+
 ## 0.3.3 (2026-04-27)
 
 ### Bug Fixes
