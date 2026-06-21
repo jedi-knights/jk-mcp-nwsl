@@ -168,20 +168,22 @@ Once the server is connected to Claude, try prompts like these.
 
 ## Production
 
-A live instance of this server is already running at:
+A live instance runs on Fly.io behind the
+[api-gateway](https://github.com/jedi-knights/api-gateway). The MCP server itself is
+private (no public address) — all access goes through the gateway:
 
 ```
-https://jk-mcp-nwsl.fly.dev/mcp
+https://jk-api-gateway.fly.dev/mcp
 ```
 
-No installation, no Python, no cloning required. Connect your MCP client directly to the URL and you are done.
+No installation, no Python, no cloning required. Point your MCP client at the URL above and you are done.
 
 ### Claude Code
 
 Install globally (recommended) so the server is available in every project:
 
 ```sh
-claude mcp add --transport http --scope user nwsl https://jk-mcp-nwsl.fly.dev/mcp
+claude mcp add --transport http --scope user nwsl https://jk-api-gateway.fly.dev/mcp
 ```
 
 Verify it's registered and healthy:
@@ -190,7 +192,7 @@ Verify it's registered and healthy:
 claude mcp list
 ```
 
-You should see `nwsl: https://jk-mcp-nwsl.fly.dev/mcp (HTTP) - ✓ Connected`. Restart Claude Code if you had it open.
+You should see `nwsl: https://jk-api-gateway.fly.dev/mcp (HTTP) - ✓ Connected`. Restart Claude Code if you had it open.
 
 **Other scopes:**
 
@@ -202,7 +204,7 @@ You should see `nwsl: https://jk-mcp-nwsl.fly.dev/mcp (HTTP) - ✓ Connected`. R
     "mcpServers": {
       "nwsl": {
         "type": "http",
-        "url": "https://jk-mcp-nwsl.fly.dev/mcp"
+        "url": "https://jk-api-gateway.fly.dev/mcp"
       }
     }
   }
@@ -221,7 +223,7 @@ Add the following to your Claude Desktop configuration file.
   "mcpServers": {
     "nwsl": {
       "type": "streamable-http",
-      "url": "https://jk-mcp-nwsl.fly.dev/mcp"
+      "url": "https://jk-api-gateway.fly.dev/mcp"
     }
   }
 }
@@ -351,7 +353,7 @@ Merge **one** of the following snippets into the top-level `mcpServers` object. 
   "mcpServers": {
     "nwsl": {
       "type": "streamable-http",
-      "url": "https://jk-mcp-nwsl.fly.dev/mcp"
+      "url": "https://jk-api-gateway.fly.dev/mcp"
     }
   }
 }
