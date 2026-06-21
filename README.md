@@ -173,7 +173,7 @@ A live instance runs on Fly.io behind the
 private (no public address) — all access goes through the gateway:
 
 ```
-https://jk-api-gateway.fly.dev/mcp
+https://jk-api-gateway.fly.dev/mcp/nwsl
 ```
 
 No installation, no Python, no cloning required. Point your MCP client at the URL above and you are done.
@@ -183,7 +183,7 @@ No installation, no Python, no cloning required. Point your MCP client at the UR
 Install globally (recommended) so the server is available in every project:
 
 ```sh
-claude mcp add --transport http --scope user nwsl https://jk-api-gateway.fly.dev/mcp
+claude mcp add --transport http --scope user nwsl https://jk-api-gateway.fly.dev/mcp/nwsl
 ```
 
 Verify it's registered and healthy:
@@ -192,7 +192,7 @@ Verify it's registered and healthy:
 claude mcp list
 ```
 
-You should see `nwsl: https://jk-api-gateway.fly.dev/mcp (HTTP) - ✓ Connected`. Restart Claude Code if you had it open.
+You should see `nwsl: https://jk-api-gateway.fly.dev/mcp/nwsl (HTTP) - ✓ Connected`. Restart Claude Code if you had it open.
 
 **Other scopes:**
 
@@ -204,7 +204,7 @@ You should see `nwsl: https://jk-api-gateway.fly.dev/mcp (HTTP) - ✓ Connected`
     "mcpServers": {
       "nwsl": {
         "type": "http",
-        "url": "https://jk-api-gateway.fly.dev/mcp"
+        "url": "https://jk-api-gateway.fly.dev/mcp/nwsl"
       }
     }
   }
@@ -223,7 +223,7 @@ Add the following to your Claude Desktop configuration file.
   "mcpServers": {
     "nwsl": {
       "type": "streamable-http",
-      "url": "https://jk-api-gateway.fly.dev/mcp"
+      "url": "https://jk-api-gateway.fly.dev/mcp/nwsl"
     }
   }
 }
@@ -353,7 +353,7 @@ Merge **one** of the following snippets into the top-level `mcpServers` object. 
   "mcpServers": {
     "nwsl": {
       "type": "streamable-http",
-      "url": "https://jk-api-gateway.fly.dev/mcp"
+      "url": "https://jk-api-gateway.fly.dev/mcp/nwsl"
     }
   }
 }

@@ -57,15 +57,23 @@ async def _handle_health(request: Request) -> JSONResponse:
 # ---------------------------------------------------------------------------
 
 
-def create_mcp_server(service: NWSLService, host: str = "0.0.0.0", port: int = 8000) -> FastMCP:
+def create_mcp_server(
+    service: NWSLService,
+    host: str = "0.0.0.0",
+    port: int = 8000,
+    path: str = "/mcp",
+) -> FastMCP:
     """Wire the application service into a FastMCP instance and register tools.
 
     Args:
         service: The NWSLService to expose as MCP tools.
         host: Bind address for HTTP transport (ignored for stdio). Defaults to 0.0.0.0.
         port: TCP port for HTTP transport (ignored for stdio). Defaults to 8000.
+        path: URL path the streamable-http transport is served at (ignored for
+            stdio). Each MCP server uses a distinct path (e.g. ``/mcp/nwsl``) so a
+            single gateway can namespace many servers under ``/mcp/<name>``.
     """
-    mcp = FastMCP("nwsl", host=host, port=port, stateless_http=True)
+    mcp = FastMCP("nwsl", host=host, port=port, stateless_http=True, streamable_http_path=path)
 
     mcp.custom_route("/livez", methods=["GET"])(_handle_livez)
     mcp.custom_route("/readyz", methods=["GET"])(_handle_readyz)

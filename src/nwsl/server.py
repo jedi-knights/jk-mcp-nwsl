@@ -86,6 +86,7 @@ def build_server(
     host: str = "0.0.0.0",
     port: int = 8000,
     api_host: str = "https://site.api.espn.com",
+    path: str = "/mcp",
 ) -> FastMCP:
     """Wire ESPNAdapter → NWSLService → FastMCP and return the server.
 
@@ -96,6 +97,7 @@ def build_server(
         host: Bind address for HTTP transport (ignored for stdio). Defaults to 0.0.0.0.
         port: TCP port for HTTP transport (ignored for stdio). Defaults to 8000.
         api_host: Base URL of the upstream ESPN API.
+        path: URL path for the streamable-http transport (ignored for stdio).
     """
     adapter = ESPNAdapter(base_url=api_host)
     # Compose cross-cutting adapters: HTTP → retry on transient errors → cache results.
@@ -110,7 +112,7 @@ def build_server(
     cms = CMSAdapter()
 
     service = NWSLService(repo=caching, sdp=sdp_caching, discovery=discovery, cms=cms)
-    return create_mcp_server(service, host=host, port=port)
+    return create_mcp_server(service, host=host, port=port, path=path)
 
 
 def main() -> None:
@@ -121,18 +123,20 @@ def main() -> None:
       MCP_TRANSPORT  — "stdio" (default) or "streamable-http"
       HOST           — bind address for HTTP transport (default: 0.0.0.0)
       PORT           — TCP port for HTTP transport (default: 8000)
+      MCP_PATH       — URL path for streamable-http transport (default: /mcp/nwsl)
     """
     api_host = os.environ.get("API_HOST", "https://site.api.espn.com")
     transport = os.environ.get("MCP_TRANSPORT", "stdio").lower()
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))
+    path = os.environ.get("MCP_PATH", "/mcp/nwsl")
 
     if transport not in _VALID_TRANSPORTS:
         raise ValueError(f"Invalid MCP_TRANSPORT={transport!r}. Must be one of: {', '.join(_VALID_TRANSPORTS)}")
 
     if transport == "streamable-http":
-        logger.info("Starting NWSL MCP server (streamable-http transport, %s:%s)", host, port)
-        build_server(host=host, port=port, api_host=api_host).run(transport="streamable-http")
+        logger.info("Starting NWSL MCP server (streamable-http transport, %s:%s, path=%s)", host, port, path)
+        build_server(host=host, port=port, api_host=api_host, path=path).run(transport="streamable-http")
     else:
         logger.info("Starting NWSL MCP server (stdio transport)")
         build_server(api_host=api_host).run(transport="stdio")

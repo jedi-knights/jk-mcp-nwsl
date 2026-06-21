@@ -11,6 +11,9 @@ primary_region = 'iad'
 [env]
   MCP_TRANSPORT = "streamable-http"
   PORT = "8000"
+  # Served at /mcp/nwsl so the api-gateway can namespace many MCP servers under
+  # /mcp/<name> with plain pass-through routing (no path rewriting).
+  MCP_PATH = "/mcp/nwsl"
 
 [http_service]
   internal_port = 8000
