@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0 (2026-06-28)
+
+### Features
+
+- **evals:** LLM-as-judge variant of expected_contains (P2) (#28) (02d6dbd)
+
 ## 0.10.0 (2026-06-28)
 
 ### Features
