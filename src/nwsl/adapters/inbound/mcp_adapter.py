@@ -19,6 +19,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from ...application.service import NWSLService
+from ...ports.inbound import Authorizer
+from .authorization import PassThroughAuthorizer
 from .tools._base import _safe_call as _safe_call_internal
 from .tools.analytics import register_analytics_tools
 from .tools.cms import register_cms_tools
@@ -64,6 +66,7 @@ def create_mcp_server(
     path: str = "/mcp",
     auth_settings=None,
     token_verifier=None,
+    authorizer: Authorizer | None = None,
 ) -> FastMCP:
     """Wire the application service into a FastMCP instance and register tools.
 
@@ -96,9 +99,10 @@ def create_mcp_server(
     mcp.custom_route("/readyz", methods=["GET"])(_handle_readyz)
     mcp.custom_route("/health", methods=["GET"])(_handle_health)
 
-    register_espn_tools(mcp, service)
-    register_sdp_tools(mcp, service)
-    register_cms_tools(mcp, service)
-    register_analytics_tools(mcp, service)
+    authz = authorizer or PassThroughAuthorizer()
+    register_espn_tools(mcp, service, authz)
+    register_sdp_tools(mcp, service, authz)
+    register_cms_tools(mcp, service, authz)
+    register_analytics_tools(mcp, service, authz)
 
     return mcp
