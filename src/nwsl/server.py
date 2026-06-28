@@ -39,6 +39,7 @@ from .adapters.outbound.sdp_retry_adapter import SDPRetryingAdapter
 from .adapters.outbound.season_discovery import SeasonDiscoveryAdapter
 from .application.service import NWSLService
 from .observability import setup_tracing
+from .security import build_token_verifier
 
 
 class _JsonFormatter(logging.Formatter):
@@ -88,6 +89,8 @@ def build_server(
     port: int = 8000,
     api_host: str = "https://site.api.espn.com",
     path: str = "/mcp",
+    auth_settings=None,
+    token_verifier=None,
 ) -> FastMCP:
     """Wire ESPNAdapter → NWSLService → FastMCP and return the server.
 
@@ -99,6 +102,8 @@ def build_server(
         port: TCP port for HTTP transport (ignored for stdio). Defaults to 8000.
         api_host: Base URL of the upstream ESPN API.
         path: URL path for the streamable-http transport (ignored for stdio).
+        auth_settings: Optional AuthSettings to enable bearer-token enforcement.
+        token_verifier: Optional TokenVerifier consulted on every request.
     """
     adapter = ESPNAdapter(base_url=api_host)
     # Compose cross-cutting adapters: HTTP → retry on transient errors → cache results.
@@ -113,7 +118,14 @@ def build_server(
     cms = CMSAdapter()
 
     service = NWSLService(repo=caching, sdp=sdp_caching, discovery=discovery, cms=cms)
-    return create_mcp_server(service, host=host, port=port, path=path)
+    return create_mcp_server(
+        service,
+        host=host,
+        port=port,
+        path=path,
+        auth_settings=auth_settings,
+        token_verifier=token_verifier,
+    )
 
 
 def main() -> None:
@@ -126,6 +138,9 @@ def main() -> None:
       PORT                  — TCP port for HTTP transport (default: 8000)
       MCP_PATH              — URL path for streamable-http transport (default: /mcp/nwsl)
       MCP_TRACING_ENABLED   — bootstrap the OpenTelemetry SDK (default false)
+      MCP_AUTH_ENABLED      — require RS256 bearer tokens on streamable-http (default false)
+      MCP_AUTH_ISSUER_URL   — auth-server origin (required when MCP_AUTH_ENABLED=true)
+      MCP_AUTH_RESOURCE_URL — this server's public URL for the aud claim (optional)
     """
     api_host = os.environ.get("API_HOST", "https://site.api.espn.com")
     transport = os.environ.get("MCP_TRANSPORT", "stdio").lower()
@@ -136,6 +151,8 @@ def main() -> None:
     if transport not in _VALID_TRANSPORTS:
         raise ValueError(f"Invalid MCP_TRANSPORT={transport!r}. Must be one of: {', '.join(_VALID_TRANSPORTS)}")
 
+    auth_settings, token_verifier = _build_auth(transport)
+
     # Wire OpenTelemetry before constructing the server so the
     # HTTPXClientInstrumentor patches httpx before any outbound
     # adapters are instantiated. A no-op when MCP_TRACING_ENABLED is
@@ -144,13 +161,41 @@ def main() -> None:
     shutdown_tracing = setup_tracing("jk-mcp-nwsl")
     try:
         if transport == "streamable-http":
-            logger.info("Starting NWSL MCP server (streamable-http transport, %s:%s, path=%s)", host, port, path)
-            build_server(host=host, port=port, api_host=api_host, path=path).run(transport="streamable-http")
+            logger.info("Starting NWSL MCP server (streamable-http transport, %s:%s, path=%s, auth=%s)",
+                        host, port, path, "on" if token_verifier else "off")
+            build_server(host=host, port=port, api_host=api_host, path=path,
+                         auth_settings=auth_settings, token_verifier=token_verifier).run(transport="streamable-http")
         else:
             logger.info("Starting NWSL MCP server (stdio transport)")
             build_server(api_host=api_host).run(transport="stdio")
     finally:
         shutdown_tracing()
+
+
+def _build_auth(transport: str):
+    """Build the AuthSettings + TokenVerifier pair for the streamable-http
+    transport.
+
+    The stdio transport relies on the subprocess boundary as its trust
+    anchor; injecting bearer-token auth there would only confuse
+    operators. The function returns ``(None, None)`` for stdio
+    regardless of the env-var state.
+    """
+    if transport != "streamable-http":
+        return None, None
+    verifier = build_token_verifier()
+    if verifier is None:
+        return None, None
+    # AuthSettings is imported lazily — when MCP_AUTH_ENABLED is unset
+    # the import cost is skipped, matching the same lazy posture the
+    # observability bootstrap uses.
+    from mcp.server.auth.settings import AuthSettings
+
+    settings = AuthSettings(
+        issuer_url=verifier.issuer,
+        resource_server_url=verifier.audience or verifier.issuer,
+    )
+    return settings, verifier
 
 
 if __name__ == "__main__":

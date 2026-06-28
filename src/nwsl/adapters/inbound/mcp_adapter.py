@@ -62,6 +62,8 @@ def create_mcp_server(
     host: str = "0.0.0.0",
     port: int = 8000,
     path: str = "/mcp",
+    auth_settings=None,
+    token_verifier=None,
 ) -> FastMCP:
     """Wire the application service into a FastMCP instance and register tools.
 
@@ -72,8 +74,23 @@ def create_mcp_server(
         path: URL path the streamable-http transport is served at (ignored for
             stdio). Each MCP server uses a distinct path (e.g. ``/mcp/nwsl``) so a
             single gateway can namespace many servers under ``/mcp/<name>``.
+        auth_settings: Optional ``mcp.server.auth.settings.AuthSettings`` that
+            enables bearer-token enforcement on the streamable-http transport.
+            Pair with ``token_verifier``. When both are None the transport
+            stays open (local-dev / stdio behaviour preserved).
+        token_verifier: Optional ``TokenVerifier`` consulted on every inbound
+            request when ``auth_settings`` is set. The FastMCP runtime turns a
+            ``None`` return into a 401 response.
     """
-    mcp = FastMCP("nwsl", host=host, port=port, stateless_http=True, streamable_http_path=path)
+    mcp = FastMCP(
+        "nwsl",
+        host=host,
+        port=port,
+        stateless_http=True,
+        streamable_http_path=path,
+        auth=auth_settings,
+        token_verifier=token_verifier,
+    )
 
     mcp.custom_route("/livez", methods=["GET"])(_handle_livez)
     mcp.custom_route("/readyz", methods=["GET"])(_handle_readyz)
