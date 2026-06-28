@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0 (2026-06-28)
+
+### Features
+
+- **authorization:** inbound port + adapter consulted on every tool dispatch (P1) (e19965f)
+
+### Bug Fixes
+
+- **authorization:** split helpers to satisfy cyclomatic-complexity cap (81f2255)
+
 ## 0.6.0 (2026-06-28)
 
 ### Features
