@@ -11,17 +11,18 @@ import logging
 from mcp.server.fastmcp import FastMCP
 
 from ....application.service import NWSLService
+from ....ports.inbound import Authorizer
 from ..formatters import (
     _fmt_adjusted_ppg,
     _fmt_results_by_tier,
     _fmt_strength_of_schedule,
 )
-from ._base import _READ_ANNOTATIONS, _safe_call
+from ._base import _READ_ANNOTATIONS, _safe_call_authorized
 
 logger = logging.getLogger(__name__)
 
 
-def register_analytics_tools(mcp: FastMCP, service: NWSLService) -> None:
+def register_analytics_tools(mcp: FastMCP, service: NWSLService, authorizer: Authorizer) -> None:
     """Register the three schedule-strength analytics tools on `mcp`."""
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
@@ -37,7 +38,9 @@ def register_analytics_tools(mcp: FastMCP, service: NWSLService) -> None:
             team_id: ESPN numeric team ID (e.g. "15362" for Portland Thorns).
         """
         logger.info("tool=get_strength_of_schedule team_id=%r", team_id)
-        return await _safe_call(service.get_strength_of_schedule(team_id), _fmt_strength_of_schedule)
+        return await _safe_call_authorized(
+            authorizer, "get_strength_of_schedule", service.get_strength_of_schedule(team_id), _fmt_strength_of_schedule
+        )
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
     async def get_results_by_opponent_tier(team_id: str, tier_size: int = 5) -> str:
@@ -55,7 +58,12 @@ def register_analytics_tools(mcp: FastMCP, service: NWSLService) -> None:
                 exceed the league size.
         """
         logger.info("tool=get_results_by_opponent_tier team_id=%r tier_size=%r", team_id, tier_size)
-        return await _safe_call(service.get_results_by_opponent_tier(team_id, tier_size), _fmt_results_by_tier)
+        return await _safe_call_authorized(
+            authorizer,
+            "get_results_by_opponent_tier",
+            service.get_results_by_opponent_tier(team_id, tier_size),
+            _fmt_results_by_tier,
+        )
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
     async def get_adjusted_points_per_game(team_id: str) -> str:
@@ -69,4 +77,6 @@ def register_analytics_tools(mcp: FastMCP, service: NWSLService) -> None:
             team_id: ESPN numeric team ID.
         """
         logger.info("tool=get_adjusted_points_per_game team_id=%r", team_id)
-        return await _safe_call(service.get_adjusted_points_per_game(team_id), _fmt_adjusted_ppg)
+        return await _safe_call_authorized(
+            authorizer, "get_adjusted_points_per_game", service.get_adjusted_points_per_game(team_id), _fmt_adjusted_ppg
+        )

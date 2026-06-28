@@ -5,6 +5,7 @@ import logging
 from mcp.server.fastmcp import FastMCP
 
 from ....application.service import NWSLService
+from ....ports.inbound import Authorizer
 from ..formatters import (
     _fmt_match_details,
     _fmt_news,
@@ -15,12 +16,12 @@ from ..formatters import (
     _fmt_team_schedule,
     _fmt_teams,
 )
-from ._base import _READ_ANNOTATIONS, _safe_call
+from ._base import _READ_ANNOTATIONS, _safe_call_authorized
 
 logger = logging.getLogger(__name__)
 
 
-def register_espn_tools(mcp: FastMCP, service: NWSLService) -> None:
+def register_espn_tools(mcp: FastMCP, service: NWSLService, authorizer: Authorizer) -> None:
     """Register the eight ESPN-backed read-only tools on `mcp`."""
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
@@ -32,7 +33,7 @@ def register_espn_tools(mcp: FastMCP, service: NWSLService) -> None:
         detailed information about a specific team.
         """
         logger.info("tool=get_teams")
-        return await _safe_call(service.get_teams(), _fmt_teams)
+        return await _safe_call_authorized(authorizer, "get_teams", service.get_teams(), _fmt_teams)
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
     async def get_team(team_id: str) -> str:
@@ -45,7 +46,7 @@ def register_espn_tools(mcp: FastMCP, service: NWSLService) -> None:
             team_id: ESPN numeric team ID (e.g. "1899" for Portland Thorns).
         """
         logger.info("tool=get_team team_id=%r", team_id)
-        return await _safe_call(service.get_team(team_id), _fmt_team)
+        return await _safe_call_authorized(authorizer, "get_team", service.get_team(team_id), _fmt_team)
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
     async def get_scoreboard(date: str | None = None, end_date: str | None = None) -> str:
@@ -60,7 +61,9 @@ def register_espn_tools(mcp: FastMCP, service: NWSLService) -> None:
             end_date: Optional end date in YYYYMMDD format. Requires `date`.
         """
         logger.info("tool=get_scoreboard date=%r end_date=%r", date, end_date)
-        return await _safe_call(service.get_scoreboard(date, end_date), _fmt_scoreboard)
+        return await _safe_call_authorized(
+            authorizer, "get_scoreboard", service.get_scoreboard(date, end_date), _fmt_scoreboard
+        )
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
     async def get_roster(team_id: str) -> str:
@@ -73,7 +76,7 @@ def register_espn_tools(mcp: FastMCP, service: NWSLService) -> None:
             team_id: ESPN numeric team ID (e.g. "15362" for Portland Thorns).
         """
         logger.info("tool=get_roster team_id=%r", team_id)
-        return await _safe_call(service.get_roster(team_id), _fmt_roster)
+        return await _safe_call_authorized(authorizer, "get_roster", service.get_roster(team_id), _fmt_roster)
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
     async def get_match_details(match_id: str) -> str:
@@ -87,7 +90,9 @@ def register_espn_tools(mcp: FastMCP, service: NWSLService) -> None:
             match_id: ESPN numeric event ID (e.g. "401853883").
         """
         logger.info("tool=get_match_details match_id=%r", match_id)
-        return await _safe_call(service.get_match_details(match_id), _fmt_match_details)
+        return await _safe_call_authorized(
+            authorizer, "get_match_details", service.get_match_details(match_id), _fmt_match_details
+        )
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
     async def get_team_schedule(team_id: str) -> str:
@@ -100,7 +105,9 @@ def register_espn_tools(mcp: FastMCP, service: NWSLService) -> None:
             team_id: ESPN numeric team ID (e.g. "15362" for Portland Thorns).
         """
         logger.info("tool=get_team_schedule team_id=%r", team_id)
-        return await _safe_call(service.get_team_schedule(team_id), _fmt_team_schedule)
+        return await _safe_call_authorized(
+            authorizer, "get_team_schedule", service.get_team_schedule(team_id), _fmt_team_schedule
+        )
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
     async def get_news(limit: int = 10) -> str:
@@ -113,7 +120,7 @@ def register_espn_tools(mcp: FastMCP, service: NWSLService) -> None:
             limit: Maximum number of articles to return (default 10).
         """
         logger.info("tool=get_news limit=%r", limit)
-        return await _safe_call(service.get_news(limit), _fmt_news)
+        return await _safe_call_authorized(authorizer, "get_news", service.get_news(limit), _fmt_news)
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
     async def get_standings() -> str:
@@ -123,4 +130,4 @@ def register_espn_tools(mcp: FastMCP, service: NWSLService) -> None:
         goals for, goals against, and goal differential.
         """
         logger.info("tool=get_standings")
-        return await _safe_call(service.get_standings(), _fmt_standings)
+        return await _safe_call_authorized(authorizer, "get_standings", service.get_standings(), _fmt_standings)

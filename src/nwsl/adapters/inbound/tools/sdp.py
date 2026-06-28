@@ -6,18 +6,19 @@ from functools import partial
 from mcp.server.fastmcp import FastMCP
 
 from ....application.service import NWSLService
+from ....ports.inbound import Authorizer
 from ..formatters import (
     _fmt_challenge_cup_standings,
     _fmt_historical_standings,
     _fmt_player_leaderboards,
     _fmt_team_season_stats,
 )
-from ._base import _READ_ANNOTATIONS, _safe_call
+from ._base import _READ_ANNOTATIONS, _safe_call_authorized
 
 logger = logging.getLogger(__name__)
 
 
-def register_sdp_tools(mcp: FastMCP, service: NWSLService) -> None:
+def register_sdp_tools(mcp: FastMCP, service: NWSLService, authorizer: Authorizer) -> None:
     """Register the four SDP/Opta-backed tools on `mcp`."""
 
     @mcp.tool(annotations=_READ_ANNOTATIONS)
@@ -38,7 +39,9 @@ def register_sdp_tools(mcp: FastMCP, service: NWSLService) -> None:
             limit: Number of players to return. Defaults to 20.
         """
         logger.info("tool=get_player_leaderboards year=%r sort=%r limit=%r", season_year, sort_by, limit)
-        return await _safe_call(
+        return await _safe_call_authorized(
+            authorizer,
+            "get_player_leaderboards",
             service.get_player_leaderboards(season_year, sort_by, limit),
             partial(_fmt_player_leaderboards, sort_by=sort_by),
         )
@@ -61,7 +64,9 @@ def register_sdp_tools(mcp: FastMCP, service: NWSLService) -> None:
             limit: Number of teams to return. Defaults to 20.
         """
         logger.info("tool=get_team_season_stats year=%r sort=%r limit=%r", season_year, sort_by, limit)
-        return await _safe_call(
+        return await _safe_call_authorized(
+            authorizer,
+            "get_team_season_stats",
             service.get_team_season_stats(season_year, sort_by, limit),
             partial(_fmt_team_season_stats, sort_by=sort_by),
         )
@@ -78,7 +83,9 @@ def register_sdp_tools(mcp: FastMCP, service: NWSLService) -> None:
             season_year: Calendar year (e.g. 2018, 2024).
         """
         logger.info("tool=get_historical_standings year=%r", season_year)
-        return await _safe_call(
+        return await _safe_call_authorized(
+            authorizer,
+            "get_historical_standings",
             service.get_historical_standings(season_year),
             partial(_fmt_historical_standings, year=season_year),
         )
@@ -96,7 +103,9 @@ def register_sdp_tools(mcp: FastMCP, service: NWSLService) -> None:
             season_year: Calendar year. Omit for the most recent Challenge Cup.
         """
         logger.info("tool=get_challenge_cup_standings year=%r", season_year)
-        return await _safe_call(
+        return await _safe_call_authorized(
+            authorizer,
+            "get_challenge_cup_standings",
             service.get_challenge_cup_standings(season_year),
             partial(_fmt_challenge_cup_standings, year=season_year),
         )
