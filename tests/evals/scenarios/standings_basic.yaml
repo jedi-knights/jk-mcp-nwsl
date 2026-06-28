@@ -7,3 +7,5 @@ tool_sequence:
 expected_contains:
   - "POR"
   - "45"
+expected_judge:
+  - "The output presents a soccer-league standings table with at least one team and its point total."
