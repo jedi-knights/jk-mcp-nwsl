@@ -120,18 +120,42 @@ def _read_actor() -> dict[str, str]:
     with empty fields, which the PassThroughAuthorizer happily allows.
     """
     actor = {"actor_type": "", "agent_id": "", "sub": "", "client_id": ""}
-    try:
-        from mcp.server.auth.middleware.auth_context import get_access_token
-    except ImportError:
-        return actor
-    token = get_access_token()
+    token = _current_access_token()
     if token is None:
         return actor
     actor["client_id"] = token.client_id or ""
-    for scope in token.scopes or []:
+    _merge_scope_claims(actor, token.scopes or [])
+    return actor
+
+
+def _current_access_token():
+    """Return the AccessToken for the in-flight request, or None.
+
+    Wraps the mcp SDK import so a stdio-only build that omits the
+    auth subpackage degrades gracefully instead of failing the
+    import. The function is its own helper so the gocyclo-style
+    counter on :func:`_read_actor` stays within the project's
+    cyclomatic-complexity cap.
+    """
+    try:
+        from mcp.server.auth.middleware.auth_context import get_access_token
+    except ImportError:
+        return None
+    return get_access_token()
+
+
+def _merge_scope_claims(actor: dict[str, str], scopes: list[str]) -> None:
+    """Mutate ``actor`` in place with the ``key:value`` scope encodings.
+
+    Scopes without a colon are ignored (those are the conventional
+    OAuth scope values like ``read`` or ``write``). Scopes whose key
+    is not one of the four known actor fields are also ignored so
+    unrelated scope conventions cannot accidentally overwrite
+    identity fields.
+    """
+    for scope in scopes:
         if ":" not in scope:
             continue
         key, _, value = scope.partition(":")
         if key in actor:
             actor[key] = value
-    return actor

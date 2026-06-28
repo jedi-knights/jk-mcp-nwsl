@@ -78,31 +78,50 @@ class PolicyServiceAuthorizer:
         self.base_url = self.base_url.rstrip("/")
 
     async def authorize(self, req: AuthorizationRequest) -> Decision:
-        client = self.http_client or httpx.AsyncClient(timeout=self.timeout_seconds)
-        owns_client = self.http_client is None
-        try:
-            payload = {
-                "subject_id": req.subject or req.client_id or req.agent_id,
-                "resource": f"mcp:{self.server_name}:{req.tool_name}",
-                "action": "invoke",
-            }
-            resp = await client.post(f"{self.base_url}/evaluate", json=payload)
-            resp.raise_for_status()
-            body = resp.json()
-        except httpx.HTTPError as exc:
-            logger.warning("policy service call failed: %s", exc)
-            if self.fail_closed:
-                return Decision.deny("authorization unavailable")
-            return Decision.allow()
-        finally:
-            if owns_client:
-                await client.aclose()
-
+        body, err = await self._fetch_decision(req)
+        if err is not None:
+            return self._error_decision(err)
         if bool(body.get("allowed")):
             return Decision.allow()
         # The policy service's reason is acceptable to surface — it
         # already obeys the no-enumeration rule per ADR-0006.
         return Decision.deny(str(body.get("reason") or "tool call not permitted"))
+
+    async def _fetch_decision(self, req: AuthorizationRequest) -> tuple[dict, httpx.HTTPError | None]:
+        """POST the authorization request to the policy service.
+
+        Returns ``(body, None)`` on success or ``({}, error)`` when the
+        call fails. Split from :meth:`authorize` so each function
+        stays under the project's cyclomatic-complexity cap.
+        """
+        client = self.http_client or httpx.AsyncClient(timeout=self.timeout_seconds)
+        owns_client = self.http_client is None
+        payload = {
+            "subject_id": req.subject or req.client_id or req.agent_id,
+            "resource": f"mcp:{self.server_name}:{req.tool_name}",
+            "action": "invoke",
+        }
+        try:
+            resp = await client.post(f"{self.base_url}/evaluate", json=payload)
+            resp.raise_for_status()
+            return resp.json(), None
+        except httpx.HTTPError as exc:
+            logger.warning("policy service call failed: %s", exc)
+            return {}, exc
+        finally:
+            if owns_client:
+                await client.aclose()
+
+    def _error_decision(self, _err: httpx.HTTPError) -> Decision:
+        """Decide between deny / allow on a policy-service error.
+
+        ``fail_closed`` is the production default; the staging-only
+        flag flips it to allow so a degraded policy service does not
+        take down a non-billable environment.
+        """
+        if self.fail_closed:
+            return Decision.deny("authorization unavailable")
+        return Decision.allow()
 
 
 def build_authorizer() -> Authorizer:
