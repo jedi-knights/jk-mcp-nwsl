@@ -435,7 +435,7 @@ wheels = [
 
 [[package]]
 name = "jk-mcp-nwsl"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },

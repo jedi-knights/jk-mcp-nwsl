@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0 (2026-06-28)
+
+### Features
+
+- **evals:** LLM-evaluation harness scaffolding (P2) (6e19585)
+
 ## 0.8.0 (2026-06-28)
 
 ### Features
