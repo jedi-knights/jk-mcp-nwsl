@@ -1,0 +1,9 @@
+name: standings_basic
+description: |
+  User asks "What are the current NWSL standings?"
+  The agent should call get_standings and present the league table.
+tool_sequence:
+  - tool: get_standings
+expected_contains:
+  - "POR"
+  - "45"
